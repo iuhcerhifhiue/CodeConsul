@@ -3,7 +3,7 @@ import CodeBlock from './CodeBlock';
 
 const phaseConfig = {
   PLAN: { color: 'text-cyan-400/50', label: '// PLAN' },
-  EXECUTE: { color: 'text-white/90', label: '// EXECUTE' },
+  EXECUTE: { color: 'text-white/80', label: '// EXECUTE' },
   REVIEW: { color: 'text-orange-400', label: '// REVIEW' },
   DONE: { color: 'text-green-400', label: '// DONE' },
 };
@@ -37,21 +37,36 @@ const markdownComponents = {
   ol: ({ children }) => <ol className="my-1 space-y-0.5 list-decimal ml-4">{children}</ol>,
 };
 
+function extractTask(content) {
+  const match = content.match(/\[TASK\]\s*([\s\S]*)/);
+  return match ? match[1].trim() : content;
+}
+
 export default function TerminalOutput({ messages, isStreaming }) {
   return (
     <div className="px-4 py-4 space-y-4 min-h-full">
       {messages.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-center pt-20">
+          <div className="w-12 h-12 rounded-lg border border-cyan-400/20 flex items-center justify-center mb-4">
+            <span className="font-mono text-xs text-cyan-400/40">O</span>
+          </div>
           <p className="font-mono text-sm text-white/30">Oikos is ready.</p>
           <p className="font-mono text-xs text-white/20 mt-1">Describe what you want to build below.</p>
+          <div className="mt-6 space-y-1">
+            <p className="font-mono text-[10px] text-white/10">Try:</p>
+            <p className="font-mono text-[10px] text-white/15">"Add JWT authentication with refresh tokens"</p>
+            <p className="font-mono text-[10px] text-white/15">"Create a pagination utility for the API"</p>
+            <p className="font-mono text-[10px] text-white/15">"Add input validation to all routes"</p>
+          </div>
         </div>
       ) : (
         messages.map((msg, i) => {
           if (msg.role === 'user') {
+            const displayText = extractTask(msg.content);
             return (
               <div key={i} className="flex items-start gap-2">
                 <span className="font-mono text-xs text-cyan-400/70 mt-0.5 shrink-0">$</span>
-                <p className="font-mono text-xs text-white/90 leading-relaxed">{msg.content}</p>
+                <p className="font-mono text-sm text-white/90 leading-relaxed">{displayText}</p>
               </div>
             );
           }

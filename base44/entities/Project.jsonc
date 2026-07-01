@@ -22,6 +22,9 @@
       "items": {
         "type": "string"
       }
+    },
+    "file_tree": {
+      "type": "string"
     }
   },
   "required": [

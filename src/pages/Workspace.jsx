@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, Github, FileCode } from 'lucide-react';
 import AgentTray from '@/components/AgentTray';
 import TerminalOutput from '@/components/TerminalOutput';
 import FileTree from '@/components/FileTree';
@@ -15,6 +15,8 @@ export default function Workspace() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [keyFiles, setKeyFiles] = useState({});
+  const [fileTree, setFileTree] = useState('');
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -54,6 +56,20 @@ export default function Workspace() {
     try {
       const proj = await base44.entities.Project.get(projectId);
       setProject(proj);
+      setFileTree(proj.file_tree || '');
+
+      // Fetch fresh key files from GitHub for agent context
+      if (proj.repo_full_name) {
+        try {
+          const res = await base44.functions.invoke('githubRepoContents', { repo_full_name: proj.repo_full_name });
+          if (res.data?.key_files) setKeyFiles(res.data.key_files);
+          if (res.data?.file_tree) setFileTree(res.data.file_tree);
+        } catch (err) {
+          console.error('Failed to fetch repo contents:', err);
+        }
+      }
+
+      // Load or create session
       const sessions = await base44.entities.Session.filter({ project_id: projectId });
       if (sessions.length > 0) {
         const session = sessions[0];
@@ -82,15 +98,34 @@ export default function Workspace() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || isStreaming) return;
-    const userMessage = input.trim();
+    const task = input.trim();
     setInput('');
     setIsStreaming(true);
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+
+    // Build context message with repo data for the agent
+    const contextParts = [];
+    if (project?.repo_full_name) contextParts.push(`Repository: ${project.repo_full_name}`);
+    if (project?.stack || fileTree) contextParts.push(`Stack: ${project?.stack || 'Unknown'}`);
+    if (fileTree) {
+      const truncatedTree = fileTree.length > 8000 ? fileTree.substring(0, 8000) + '\n... (truncated)' : fileTree;
+      contextParts.push(`File Tree:\n${truncatedTree}`);
+    }
+    if (Object.keys(keyFiles).length > 0) {
+      const filesContext = Object.entries(keyFiles).map(([path, content]) =>
+        `--- ${path} ---\n${content}`
+      ).join('\n\n');
+      contextParts.push(`Key Files:\n${filesContext}`);
+    }
+
+    const contextMessage = contextParts.length > 0
+      ? `[PROJECT CONTEXT]\n${contextParts.join('\n')}\n\n[TASK]\n${task}`
+      : task;
+
+    setMessages((prev) => [...prev, { role: 'user', content: contextMessage }]);
+
     try {
       const conv = await base44.agents.getConversation(conversationId);
-      const context = `Project: ${project?.repo_full_name || 'unknown'}\nStack: ${project?.stack || 'unknown'}\nArchitecture: ${project?.architecture_notes || 'none'}\n\nTask: ${userMessage}`;
-      await base44.agents.addMessage(conv, { role: 'user', content: context });
-      setIsStreaming(false);
+      await base44.agents.addMessage(conv, { role: 'user', content: contextMessage });
     } catch (err) {
       console.error('Failed to send message:', err);
       setIsStreaming(false);
@@ -100,40 +135,77 @@ export default function Workspace() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#080B0F] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+          <span className="font-mono text-xs text-white/30">Loading workspace...</span>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="h-screen flex flex-col bg-[#080B0F] text-white">
+      {/* Header */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5">
         <Link to="/dashboard" className="text-white/30 hover:text-cyan-400 transition-colors">
           <ArrowLeft className="w-4 h-4" />
         </Link>
-        <span className="font-mono text-xs text-white/60">{project?.repo_full_name}</span>
-        <span className="font-mono text-[10px] text-white/20 ml-auto">main</span>
+        <Github className="w-4 h-4 text-white/30" />
+        <span className="font-mono text-xs text-white/70">{project?.repo_full_name}</span>
+        {project?.stack && (
+          <span className="font-mono text-[10px] text-cyan-400/40 ml-2">{project.stack}</span>
+        )}
+        <div className="ml-auto flex items-center gap-3">
+          <span className="font-mono text-[10px] text-white/20">main</span>
+          <div className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-400/60" />
+            <span className="font-mono text-[10px] text-white/20">connected</span>
+          </div>
+        </div>
       </div>
 
+      {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-48 border-r border-white/5 overflow-y-auto hidden md:block">
-          <div className="px-3 py-2 border-b border-white/5">
-            <span className="font-mono text-[10px] text-white/30 uppercase tracking-wider">Files</span>
+        {/* File tree sidebar */}
+        <div className="w-52 border-r border-white/5 overflow-y-auto hidden md:flex flex-col">
+          <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
+            <span className="font-mono text-[10px] text-white/30 uppercase tracking-wider">Generated</span>
+            <span className="font-mono text-[10px] text-white/20">{files.length}</span>
           </div>
-          <FileTree files={files} />
+          <div className="flex-1 overflow-y-auto">
+            <FileTree files={files} />
+          </div>
+          {fileTree && (
+            <div className="border-t border-white/5 p-2">
+              <div className="px-1 py-1">
+                <span className="font-mono text-[9px] text-white/20 uppercase tracking-wider">Repo Files</span>
+              </div>
+              <div className="max-h-32 overflow-y-auto">
+                {fileTree.split('\n').slice(0, 50).map((path, i) => (
+                  <div key={i} className="flex items-center gap-1.5 px-2 py-0.5">
+                    <FileCode className="w-2.5 h-2.5 text-white/10 shrink-0" />
+                    <span className="font-mono text-[9px] text-white/20 truncate">{path}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Terminal output */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <TerminalOutput messages={messages} isStreaming={isStreaming} />
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 px-4 py-2.5 border-t border-white/5">
+      {/* Input bar */}
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 px-4 py-3 border-t border-white/5">
         <span className="font-mono text-xs text-cyan-400/70">$</span>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Tell Oikos what to build..."
-          className="flex-1 bg-transparent font-mono text-xs text-white placeholder-white/20 outline-none"
+          className="flex-1 bg-transparent font-mono text-sm text-white placeholder-white/20 outline-none"
           disabled={isStreaming}
           autoFocus
         />

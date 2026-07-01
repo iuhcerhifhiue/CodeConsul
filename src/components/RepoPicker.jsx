@@ -10,6 +10,7 @@ export default function RepoPicker({ onClose, onConnected }) {
   const [repos, setRepos] = useState([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [githubConnected, setGithubConnected] = useState(false);
+  const [cloningRepo, setCloningRepo] = useState(null);
 
   const fetchRepos = async () => {
     setLoadingRepos(true);
@@ -32,21 +33,39 @@ export default function RepoPicker({ onClose, onConnected }) {
 
   const createProject = async (fullName) => {
     setConnecting(true);
+    setCloningRepo(fullName);
     try {
-      await base44.entities.Project.create({
+      const project = await base44.entities.Project.create({
         repo_name: fullName.split('/').pop(),
         repo_full_name: fullName,
         repo_url: `https://github.com/${fullName}`,
         stack: '',
         architecture_notes: '',
         key_decisions: [],
+        file_tree: '',
       });
+
+      // Clone: fetch actual repo tree and key files
+      try {
+        const res = await base44.functions.invoke('githubRepoContents', { repo_full_name: fullName });
+        if (res.data) {
+          await base44.entities.Project.update(project.id, {
+            stack: res.data.stack || '',
+            file_tree: (res.data.file_tree || '').substring(0, 10000),
+            architecture_notes: `${res.data.file_count || 0} files indexed. Branch: ${res.data.default_branch || 'main'}`,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch repo contents:', err);
+      }
+
       onConnected?.();
       onClose();
     } catch (err) {
       console.error('Failed to create project:', err);
     } finally {
       setConnecting(false);
+      setCloningRepo(null);
     }
   };
 
@@ -99,13 +118,20 @@ export default function RepoPicker({ onClose, onConnected }) {
                     disabled={connecting}
                     className="flex items-center gap-2 w-full p-2.5 rounded-lg hover:bg-white/5 transition-colors text-left disabled:opacity-30"
                   >
-                    <Github className="w-4 h-4 text-white/30 shrink-0" />
+                    {cloningRepo === repo.name ? (
+                      <Loader2 className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+                    ) : (
+                      <Github className="w-4 h-4 text-white/30 shrink-0" />
+                    )}
                     <div className="flex-1 min-w-0">
                       <span className="font-mono text-xs text-white/60 truncate block">{repo.name}</span>
                       {repo.language && (
                         <span className="font-mono text-[9px] text-white/20">{repo.language}</span>
                       )}
                     </div>
+                    {cloningRepo === repo.name && (
+                      <span className="font-mono text-[9px] text-cyan-400/50">cloning...</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -140,8 +166,17 @@ export default function RepoPicker({ onClose, onConnected }) {
             disabled={!repoName.trim() || connecting}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-cyan-400/10 border border-cyan-400/30 rounded-lg font-mono text-sm text-cyan-400 hover:bg-cyan-400/20 transition-colors disabled:opacity-30"
           >
-            {connecting ? 'Connecting...' : 'Connect Repo'}
-            {!connecting && <ArrowRight className="w-4 h-4" />}
+            {connecting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Cloning repository...
+              </>
+            ) : (
+              <>
+                Connect Repo
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </div>
