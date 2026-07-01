@@ -58,6 +58,65 @@ Deno.serve(async (req) => {
       return Response.json({ path: file_path, content: decoded, sha: data.sha, size: data.size });
     }
 
+    if (operation === 'edit') {
+      // Targeted patch: replace exact substrings instead of rewriting the whole file.
+      // Accepts a single { old_string, new_string } or an array of edits.
+      const rawEdits = Array.isArray(body.edits)
+        ? body.edits
+        : [{ old_string: body.old_string, new_string: body.new_string, replace_all: body.replace_all }];
+
+      if (rawEdits.length === 0 || rawEdits.some((e) => typeof e.old_string !== 'string' || typeof e.new_string !== 'string')) {
+        return Response.json({ error: 'edit requires old_string and new_string (or an edits[] array of them)' }, { status: 400 });
+      }
+
+      const readRes = await fetch(apiUrl, { headers });
+      if (!readRes.ok) return safeError(readRes, 'File not found');
+      const readData = await readRes.json();
+      if (readData.encoding !== 'base64') {
+        return Response.json({ error: 'File is not editable as text' }, { status: 422 });
+      }
+
+      let text = decodeBase64(readData.content);
+      const applied = [];
+      for (let i = 0; i < rawEdits.length; i++) {
+        const { old_string, new_string, replace_all } = rawEdits[i];
+        if (old_string === new_string) {
+          return Response.json({ error: `edit ${i}: old_string and new_string are identical` }, { status: 400 });
+        }
+        const occurrences = text.split(old_string).length - 1;
+        if (occurrences === 0) {
+          return Response.json({ error: `edit ${i}: old_string not found in ${file_path}` }, { status: 422 });
+        }
+        if (occurrences > 1 && !replace_all) {
+          return Response.json({ error: `edit ${i}: old_string is not unique (${occurrences} matches). Add more context or set replace_all: true` }, { status: 422 });
+        }
+        text = replace_all ? text.split(old_string).join(new_string) : text.replace(old_string, new_string);
+        applied.push({ index: i, replaced: replace_all ? occurrences : 1 });
+      }
+
+      const editRes = await fetch(apiUrl, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: commit_message || `Oikos: edit ${file_path}`,
+          content: encodeBase64(text),
+          sha: readData.sha,
+          ...(branch && { branch }),
+        }),
+      });
+      if (!editRes.ok) return safeError(editRes, 'Failed to write edited file');
+      const editData = await editRes.json();
+      return Response.json({
+        path: file_path,
+        operation: 'edited',
+        edits_applied: applied.length,
+        applied,
+        sha: editData.content?.sha,
+        commit_sha: editData.commit?.sha,
+        commit_url: editData.commit?.html_url,
+      });
+    }
+
     if (operation === 'write' || operation === 'update') {
       if (content === undefined) return Response.json({ error: 'content is required' }, { status: 400 });
 
@@ -119,7 +178,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return Response.json({ error: 'Unknown operation. Use read, write, or delete.' }, { status: 400 });
+    return Response.json({ error: 'Unknown operation. Use read, write, edit, or delete.' }, { status: 400 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
