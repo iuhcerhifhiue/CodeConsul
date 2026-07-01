@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom';
 import { PLANS, AGENT_INFO } from '@/lib/plans';
-import { Crown, Lock, Check, ArrowUp, Layout, Server, Terminal, CheckCircle, Shield, Compass, Box } from 'lucide-react';
+import {
+  Crown, Lock, Check, ArrowUp, Layout, Server, Terminal, CheckCircle, Eye,
+  Database, Network, Gauge, FileText, Bug, Shield, Cloud, Smartphone,
+  BarChart3, Wand2, Compass, Brain, Zap, Accessibility, ArrowRightLeft, Activity, Box, Globe,
+} from 'lucide-react';
 
 const ICON_MAP = {
-  Layout,
-  Server,
-  Terminal,
-  CheckCircle,
-  Shield,
-  Compass,
+  Layout, Server, Terminal, CheckCircle, Eye,
+  Database, Network, Gauge, FileText, Bug, Shield, Cloud, Smartphone,
+  BarChart3, Wand2, Compass, Brain, Zap, Accessibility, ArrowRightLeft, Activity, Globe,
 };
 
 export default function AgentRoster({ currentPlan, activeAgents = [] }) {

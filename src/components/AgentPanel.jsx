@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Loader2, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Layout, Server, Terminal, CheckCircle, Shield, Compass, Box } from 'lucide-react';
+import {
+  Loader2, ChevronDown, ChevronUp, CheckCircle2, AlertCircle,
+  Layout, Server, Terminal, CheckCircle, Eye,
+  Database, Network, Gauge, FileText, Bug, Shield, Cloud, Smartphone,
+  BarChart3, Wand2, Compass, Brain, Zap, Accessibility, ArrowRightLeft, Activity, Box, Globe,
+} from 'lucide-react';
 import { AGENT_INFO } from '@/lib/plans';
 
 const ICON_MAP = {
-  Layout,
-  Server,
-  Terminal,
-  CheckCircle,
-  Shield,
-  Compass,
+  Layout, Server, Terminal, CheckCircle, Eye,
+  Database, Network, Gauge, FileText, Bug, Shield, Cloud, Smartphone,
+  BarChart3, Wand2, Compass, Brain, Zap, Accessibility, ArrowRightLeft, Activity, Globe,
 };
 
 export default function AgentPanel({ agentName, messages, status, task }) {

@@ -51,7 +51,7 @@ export default function Plans() {
         <p className="text-xs font-bold tracking-[0.2em] text-editorial mb-3">05 — PLANS</p>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Choose your engineering team</h1>
         <p className="text-base text-gray-600 max-w-xl mb-12">
-          Every plan includes Oikos (CEO) who orchestrates the specialist agents. Higher tiers unlock more specialists.
+          Every plan includes Oikos (CEO) who orchestrates the specialist agents. Pick a plan to instantly unlock more specialists — no payment required.
         </p>
 
         {/* Plan grid */}
@@ -71,10 +71,10 @@ export default function Plans() {
                   )}
                 </div>
 
-                {/* Price */}
+                {/* Agent count */}
                 <div className="mb-4">
-                  <span className="text-3xl font-bold">${plan.price}</span>
-                  <span className="text-sm text-gray-400">/mo</span>
+                  <span className="text-3xl font-bold">{plan.agents.length}</span>
+                  <span className="text-sm text-gray-400"> agents</span>
                 </div>
 
                 <p className="text-xs text-gray-500 mb-6">{plan.description}</p>
