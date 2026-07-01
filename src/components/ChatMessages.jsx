@@ -1,13 +1,12 @@
 import ReactMarkdown from 'react-markdown';
 import CodeBlock from './CodeBlock';
 import ToolCall from './ToolCall';
-import { Bot } from 'lucide-react';
 
 const phaseConfig = {
-  PLAN: { symbol: 'Planning', color: 'text-blue-600', bg: 'bg-blue-50' },
-  EXECUTE: { symbol: 'Executing', color: 'text-amber-600', bg: 'bg-amber-50' },
-  REVIEW: { symbol: 'Reviewing', color: 'text-purple-600', bg: 'bg-purple-50' },
-  DONE: { symbol: 'Complete', color: 'text-green-600', bg: 'bg-green-50' },
+  PLAN: { label: 'Planning', color: 'text-blue-600' },
+  EXECUTE: { label: 'Executing', color: 'text-amber-600' },
+  REVIEW: { label: 'Reviewing', color: 'text-purple-600' },
+  DONE: { label: 'Done', color: 'text-green-600' },
 };
 
 const mdComponents = {
@@ -16,8 +15,8 @@ const mdComponents = {
     const phase = phaseConfig[text];
     if (phase) {
       return (
-        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${phase.bg} ${phase.color} text-xs font-semibold mt-4 mb-2`}>
-          {phase.symbol}
+        <div className="flex items-center gap-2 mt-4 mb-2">
+          <span className={`text-xs font-semibold uppercase tracking-wider ${phase.color}`}>⟡ {phase.label}</span>
         </div>
       );
     }
@@ -34,10 +33,10 @@ const mdComponents = {
     const match = /language-(\w+)/.exec(className || '');
     return <CodeBlock code={String(children).replace(/\n$/, '')} language={match ? match[1] : ''} />;
   },
-  p: ({ children }) => <p className="text-sm text-gray-600 leading-relaxed my-2">{children}</p>,
-  li: ({ children }) => <li className="text-sm text-gray-600 leading-relaxed ml-5 list-disc">{children}</li>,
-  ul: ({ children }) => <ul className="my-2 space-y-1">{children}</ul>,
-  ol: ({ children }) => <ol className="my-2 space-y-1 list-decimal ml-5">{children}</ol>,
+  p: ({ children }) => <p className="text-[13px] text-gray-700 leading-relaxed my-1.5">{children}</p>,
+  li: ({ children }) => <li className="text-[13px] text-gray-700 leading-relaxed ml-4 list-disc">{children}</li>,
+  ul: ({ children }) => <ul className="my-1.5 space-y-0.5">{children}</ul>,
+  ol: ({ children }) => <ol className="my-1.5 space-y-0.5 list-decimal ml-4">{children}</ol>,
   strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
 };
 
@@ -50,20 +49,20 @@ export default function ChatMessages({ messages, isStreaming }) {
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-6 py-20">
-        <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center mb-5">
-          <Bot className="w-7 h-7 text-white" />
+        <div className="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center mb-4">
+          <span className="text-white text-lg font-bold">α</span>
         </div>
-        <h2 className="font-heading text-xl font-semibold text-gray-900">Oikos is ready</h2>
-        <p className="text-gray-500 mt-2">Describe what you want to build and Oikos will write the code directly to your repo.</p>
-        <div className="mt-8 grid gap-2 max-w-md w-full">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Try these</p>
+        <h2 className="font-heading text-lg font-semibold text-gray-900">Oikos is ready</h2>
+        <p className="text-sm text-gray-500 mt-1.5 max-w-sm">Describe what you want to build and Oikos will read, write, and commit code directly to your repo.</p>
+        <div className="mt-8 flex flex-col gap-1.5 max-w-lg w-full">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1 text-left">Try asking</p>
           {[
             'Add JWT authentication with refresh tokens',
             'Create a pagination utility for the API',
             'Add input validation to all routes',
           ].map((s) => (
-            <div key={s} className="text-left px-4 py-2.5 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-default text-sm text-gray-600">
-              {s}
+            <div key={s} className="text-left px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-default text-[13px] text-gray-600 font-mono">
+              <span className="text-gray-300 mr-2">›</span>{s}
             </div>
           ))}
         </div>
@@ -72,14 +71,15 @@ export default function ChatMessages({ messages, isStreaming }) {
   }
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
+    <div className="px-4 md:px-8 py-6 space-y-1 max-w-3xl mx-auto font-mono">
       {messages.map((msg, i) => {
         if (msg.role === 'user') {
           const displayText = extractTask(msg.content);
           return (
-            <div key={i} className="flex justify-end">
-              <div className="max-w-[80%] bg-gray-900 text-white rounded-2xl rounded-tr-md px-4 py-2.5">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayText}</p>
+            <div key={i} className="py-2">
+              <div className="flex gap-2">
+                <span className="text-green-600 select-none shrink-0">›</span>
+                <p className="text-[13px] text-gray-800 leading-relaxed whitespace-pre-wrap">{displayText}</p>
               </div>
             </div>
           );
@@ -90,31 +90,28 @@ export default function ChatMessages({ messages, isStreaming }) {
         const hasContent = msg.content && msg.content.trim();
 
         return (
-          <div key={i} className="flex gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center shrink-0 mt-0.5">
-              <Bot className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0 space-y-2">
-              {hasContent && (
-                <div className="text-gray-700">
+          <div key={i} className="py-1">
+            {hasContent && (
+              <div className="flex gap-2">
+                <span className="text-orange-500 select-none shrink-0 mt-0.5">⏺</span>
+                <div className="flex-1 min-w-0">
                   <ReactMarkdown components={mdComponents}>{msg.content}</ReactMarkdown>
                 </div>
-              )}
-              {hasToolCalls && (
-                <div className="space-y-1.5">
-                  {msg.tool_calls.map((tc, ti) => (
-                    <ToolCall key={ti} toolCall={tc} />
-                  ))}
-                </div>
-              )}
-              {isStreaming && isLast && !hasToolCalls && (
-                <div className="flex items-center gap-1.5 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              )}
-            </div>
+              </div>
+            )}
+            {hasToolCalls && (
+              <div className="space-y-0.5 mt-1.5">
+                {msg.tool_calls.map((tc, ti) => (
+                  <ToolCall key={ti} toolCall={tc} />
+                ))}
+              </div>
+            )}
+            {isStreaming && isLast && !hasToolCalls && (
+              <div className="flex items-center gap-1.5 mt-2 ml-6">
+                <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                <span className="text-xs text-gray-400">working...</span>
+              </div>
+            )}
           </div>
         );
       })}

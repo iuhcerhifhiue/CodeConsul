@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, ArrowRight, Loader2, Github, Link2, AlertCircle } from 'lucide-react';
+import { X, Loader2, Github, Link2, AlertCircle } from 'lucide-react';
 
 const GITHUB_CONNECTOR_ID = '6a242ab8748831bf367aed86';
 
@@ -27,9 +27,17 @@ export default function RepoPicker({ onClose, onConnected }) {
   };
 
   const handleConnectGithub = async () => {
+    // Open popup synchronously BEFORE any async call to avoid popup blockers
+    const popup = window.open('about:blank', '_blank', 'width=600,height=750');
     try {
       const redirectUrl = await base44.connectors.connectAppUser(GITHUB_CONNECTOR_ID);
-      const popup = window.open(redirectUrl, '_blank', 'width=600,height=700');
+      if (popup) {
+        popup.location.href = redirectUrl;
+      } else {
+        // Popup was blocked — fallback to full-page redirect
+        window.location.href = redirectUrl;
+        return;
+      }
 
       // Poll for popup close, then re-check connection
       const timer = setInterval(() => {
@@ -40,6 +48,7 @@ export default function RepoPicker({ onClose, onConnected }) {
         }
       }, 500);
     } catch (err) {
+      if (popup) popup.close();
       setError('Failed to start GitHub connection. Please try again.');
     }
   };
@@ -114,8 +123,8 @@ export default function RepoPicker({ onClose, onConnected }) {
           </div>
         ) : !githubConnected ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-sm text-amber-700">
                 Connect your GitHub account so Oikos can read and write to your repositories.
               </p>
@@ -126,10 +135,9 @@ export default function RepoPicker({ onClose, onConnected }) {
             >
               <Github className="w-4 h-4" />
               Connect GitHub Account
-              <ArrowRight className="w-4 h-4" />
             </button>
             <p className="text-xs text-gray-400 text-center">
-              One-time connection. Then paste any repo URL.
+              Opens in a new window. Come back here after authorizing.
             </p>
           </div>
         ) : (
@@ -156,9 +164,9 @@ export default function RepoPicker({ onClose, onConnected }) {
               className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-30"
             >
               {connecting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Cloning repository...</>
+                <><Loader2 className="w-4 h-4 animate-spin" />Indexing repository...</>
               ) : (
-                <><Github className="w-4 h-4" />Clone & Connect<ArrowRight className="w-4 h-4" /></>
+                <><Github className="w-4 h-4" />Connect Repository</>
               )}
             </button>
           </div>

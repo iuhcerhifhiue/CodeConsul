@@ -230,8 +230,9 @@ export default function Workspace() {
             {error}
           </div>
         )}
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-          <div className={`flex items-end gap-2 rounded-xl border transition-colors ${isStreaming ? 'border-gray-200 bg-gray-50' : 'border-gray-300 bg-white focus-within:border-gray-900'}`}>
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+          <div className={`flex items-end gap-2 rounded-lg border transition-colors ${isStreaming ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-white focus-within:border-gray-400'}`}>
+            <span className="font-mono text-[13px] text-green-600 pl-4 py-3 select-none shrink-0">›</span>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -241,8 +242,8 @@ export default function Workspace() {
                   handleSubmit(e);
                 }
               }}
-              placeholder={isStreaming ? 'Oikos is working...' : 'Describe what you want to build...'}
-              className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none resize-none py-3 px-4 min-h-[20px] max-h-32"
+              placeholder={isStreaming ? 'Oikos is working...' : 'Ask Oikos to build something...'}
+              className="flex-1 bg-transparent font-mono text-[13px] text-gray-900 placeholder-gray-300 outline-none resize-none py-3 pr-4 min-h-[20px] max-h-32"
               disabled={isStreaming}
               autoFocus
               rows={1}
@@ -250,14 +251,14 @@ export default function Workspace() {
             <button
               type="submit"
               disabled={isStreaming || !input.trim()}
-              className="m-2 p-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-20 disabled:hover:bg-gray-900 transition-colors shrink-0"
+              className="m-1.5 p-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-20 disabled:hover:bg-gray-900 transition-colors shrink-0"
             >
-              {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {isStreaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </button>
           </div>
-          <div className="flex items-center justify-between px-1 mt-2">
-            <span className="text-xs text-gray-400">Press Enter to send · Shift+Enter for new line</span>
-            <span className="text-xs text-gray-400 hidden sm:block">Oikos has read &amp; write access</span>
+          <div className="flex items-center justify-between px-1 mt-1.5">
+            <span className="text-[11px] text-gray-300 font-mono">enter to send · shift+enter for newline</span>
+            <span className="text-[11px] text-gray-300 font-mono hidden sm:block">read &amp; write access</span>
           </div>
         </form>
       </div>

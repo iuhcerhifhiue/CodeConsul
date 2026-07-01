@@ -46,19 +46,19 @@ export default function ActivityFeed({ messages }) {
         return (
           <div
             key={i}
-            className={`flex items-center gap-2 px-4 py-2 transition-colors ${isActive ? 'bg-gray-50' : ''}`}
+            className={`flex items-center gap-2 px-4 py-1.5 transition-colors ${isActive ? 'bg-gray-50' : ''}`}
           >
             {isActive ? (
-              <Loader2 className={`w-3.5 h-3.5 shrink-0 animate-spin ${act.config.color}`} />
+              <Loader2 className={`w-3 h-3 shrink-0 animate-spin ${act.config.color}`} />
             ) : isDone ? (
-              <Check className="w-3.5 h-3.5 shrink-0 text-green-400" />
+              <Check className="w-3 h-3 shrink-0 text-green-400" />
             ) : isFailed ? (
-              <X className="w-3.5 h-3.5 shrink-0 text-red-400" />
+              <X className="w-3 h-3 shrink-0 text-red-400" />
             ) : (
-              <Icon className={`w-3.5 h-3.5 shrink-0 ${act.config.color}`} />
+              <Icon className={`w-3 h-3 shrink-0 ${act.config.color}`} />
             )}
-            <span className={`text-xs shrink-0 ${act.config.color}`}>{act.config.label}</span>
-            <span className="text-xs text-gray-500 truncate flex-1">{act.path}</span>
+            <span className={`text-[11px] font-mono shrink-0 ${act.config.color}`}>{act.config.label}</span>
+            <span className="text-[11px] text-gray-500 truncate flex-1 font-mono">{act.path}</span>
           </div>
         );
       })}
