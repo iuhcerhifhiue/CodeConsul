@@ -27,8 +27,21 @@ export default function RepoPicker({ onClose, onConnected }) {
   };
 
   const handleConnectGithub = async () => {
-    const redirectUrl = await base44.connectors.connectAppUser(GITHUB_CONNECTOR_ID);
-    window.location.href = redirectUrl;
+    try {
+      const redirectUrl = await base44.connectors.connectAppUser(GITHUB_CONNECTOR_ID);
+      const popup = window.open(redirectUrl, '_blank', 'width=600,height=700');
+
+      // Poll for popup close, then re-check connection
+      const timer = setInterval(() => {
+        if (!popup || popup.closed) {
+          clearInterval(timer);
+          setCheckingAuth(true);
+          checkGithubConnection();
+        }
+      }, 500);
+    } catch (err) {
+      setError('Failed to start GitHub connection. Please try again.');
+    }
   };
 
   const parseRepoName = (input) => {
