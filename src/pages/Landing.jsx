@@ -28,7 +28,7 @@ export default function Landing() {
             <p className="text-xs font-bold tracking-[0.2em] text-editorial mb-8">01 — AUTONOMOUS CODING AGENT</p>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight">
               DEPLOY AN AI ENGINEER THAT ACTUALLY{' '}
-              <span className="bg-editorial px-2 py-0.5 text-5xl">SHIPS CODE.</span>
+              <span className="bg-editorial px-2 py-0.5 text-4xl">SHIPS CODE.</span>
             </h1>
             <p className="text-base text-gray-600 mt-8 max-w-md leading-relaxed">
               Paste a GitHub URL. Describe what you want built. Oikos reads your codebase, writes production-ready files, and commits directly — no hand-holding required.
