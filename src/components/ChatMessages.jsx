@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import CodeBlock from './CodeBlock';
 import ToolCall from './ToolCall';
-import { Brain, Terminal, Search, CheckCircle2 } from 'lucide-react';
+import { Brain, Terminal, Search, CheckCircle2, FileSearch } from 'lucide-react';
 
 const phaseConfig = {
   PLAN: { label: 'Planning', icon: Brain, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
@@ -45,6 +45,36 @@ const mdComponents = {
 function extractTask(content) {
   const match = content.match(/\[TASK\]\s*([\s\S]*)/);
   return match ? match[1].trim() : content.replace(/\[PROJECT CONTEXT\][\s\S]*?(?=\[TASK\]|$)/, '').trim();
+}
+
+function extractFilePath(args) {
+  return args.file_path || args.path || args.filePath || args.filename || args.repo_full_name || '';
+}
+
+function ReadSummary({ toolCalls }) {
+  const files = toolCalls.map((tc) => {
+    let args = {};
+    try { args = JSON.parse(tc.arguments_string); } catch {}
+    return extractFilePath(args);
+  }).filter(Boolean);
+
+  const anyActive = toolCalls.some((tc) => ['pending', 'running', 'in_progress'].includes(tc.status));
+  const allDone = toolCalls.every((tc) => ['completed', 'success'].includes(tc.status));
+  const anyFailed = toolCalls.some((tc) => ['failed', 'error'].includes(tc.status));
+
+  return (
+    <div className="flex items-center gap-1.5 py-0.5">
+      <FileSearch className={`w-3 h-3 shrink-0 ${anyActive ? 'text-gray-400 animate-pulse' : anyFailed ? 'text-red-400' : 'text-gray-300'}`} />
+      <span className="text-[12px] text-gray-400">
+        {anyActive ? 'Reading' : 'Read'} {toolCalls.length} file{toolCalls.length > 1 ? 's' : ''}
+      </span>
+      {allDone && files.length > 0 && (
+        <span className="text-[11px] text-gray-300 truncate">
+          {files.map((f) => f.split('/').pop()).join(', ')}
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function ChatMessages({ messages, isStreaming }) {
@@ -91,6 +121,22 @@ export default function ChatMessages({ messages, isStreaming }) {
         const hasToolCalls = msg.tool_calls && msg.tool_calls.length > 0;
         const hasContent = msg.content && msg.content.trim();
 
+        // Split tool calls: reads get collapsed, writes/updates/deletes shown individually
+        let readCalls = [];
+        let writeCalls = [];
+        if (hasToolCalls) {
+          msg.tool_calls.forEach((tc) => {
+            let args = {};
+            try { args = JSON.parse(tc.arguments_string); } catch {}
+            const op = args.operation || 'read';
+            if (op === 'read') {
+              readCalls.push(tc);
+            } else {
+              writeCalls.push(tc);
+            }
+          });
+        }
+
         return (
           <div key={i} className="py-0.5">
             {hasContent && (
@@ -101,9 +147,14 @@ export default function ChatMessages({ messages, isStreaming }) {
                 </div>
               </div>
             )}
-            {hasToolCalls && (
+            {readCalls.length > 0 && (
+              <div className="mt-1 ml-6">
+                <ReadSummary toolCalls={readCalls} />
+              </div>
+            )}
+            {writeCalls.length > 0 && (
               <div className="space-y-0 mt-1 ml-6">
-                {msg.tool_calls.map((tc, ti) => (
+                {writeCalls.map((tc, ti) => (
                   <ToolCall key={ti} toolCall={tc} />
                 ))}
               </div>

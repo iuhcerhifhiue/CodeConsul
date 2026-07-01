@@ -8,6 +8,10 @@ const opConfig = {
   delete: { icon: Trash2, label: 'Delete', color: 'text-red-500' },
 };
 
+function extractFilePath(args) {
+  return args.file_path || args.path || args.filePath || args.filename || args.repo_full_name || 'unknown';
+}
+
 export default function ToolCall({ toolCall }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -21,7 +25,7 @@ export default function ToolCall({ toolCall }) {
 
   const op = args.operation || 'read';
   const config = opConfig[op] || opConfig.read;
-  const filePath = args.file_path || args.repo_full_name || 'unknown';
+  const filePath = extractFilePath(args);
 
   const isActive = ['pending', 'running', 'in_progress'].includes(toolCall.status);
   const isDone = ['completed', 'success'].includes(toolCall.status);
@@ -48,6 +52,11 @@ export default function ToolCall({ toolCall }) {
     else if (results.commit_sha) resultSummary = 'committed';
   }
 
+  // Shorten path for display: show last 2 segments
+  const shortPath = filePath !== 'unknown'
+    ? filePath.split('/').slice(-2).join('/')
+    : 'unknown';
+
   return (
     <div>
       <button
@@ -56,7 +65,7 @@ export default function ToolCall({ toolCall }) {
       >
         <StatusIcon className={`w-3 h-3 shrink-0 ${statusColor} ${isActive ? 'animate-spin' : ''}`} />
         <span className={`text-[12px] font-medium shrink-0 ${config.color}`}>{label}</span>
-        <span className="text-[12px] text-gray-500 truncate">{filePath}</span>
+        <span className="text-[12px] text-gray-500 truncate">{shortPath}</span>
         {resultSummary && <span className="text-[11px] text-gray-400 shrink-0">{resultSummary}</span>}
         {!hideDetails && (
           <ChevronDown className={`w-3 h-3 text-gray-300 shrink-0 ml-auto transition-transform ${expanded ? 'rotate-180' : ''} group-hover:text-gray-400`} />
