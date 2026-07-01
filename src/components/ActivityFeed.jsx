@@ -1,10 +1,10 @@
 import { Eye, FilePen, Trash2, Loader2, Check, X } from 'lucide-react';
 
 const opConfig = {
-  read: { icon: Eye, label: 'read', color: 'text-blue-400/60', dot: 'bg-blue-400' },
-  write: { icon: FilePen, label: 'write', color: 'text-green-400/60', dot: 'bg-green-400' },
-  update: { icon: FilePen, label: 'update', color: 'text-amber-400/60', dot: 'bg-amber-400' },
-  delete: { icon: Trash2, label: 'delete', color: 'text-red-400/60', dot: 'bg-red-400' },
+  read: { icon: Eye, label: 'read', color: 'text-blue-500' },
+  write: { icon: FilePen, label: 'write', color: 'text-green-500' },
+  update: { icon: FilePen, label: 'update', color: 'text-amber-500' },
+  delete: { icon: Trash2, label: 'delete', color: 'text-red-500' },
 };
 
 function parseActivities(messages) {
@@ -29,8 +29,8 @@ export default function ActivityFeed({ messages }) {
 
   if (!activities.length) {
     return (
-      <div className="px-3 py-6 text-center">
-        <p className="font-mono text-[10px] text-white/15">No operations yet</p>
+      <div className="px-4 py-8 text-center">
+        <p className="text-xs text-gray-400">No operations yet</p>
       </div>
     );
   }
@@ -46,20 +46,19 @@ export default function ActivityFeed({ messages }) {
         return (
           <div
             key={i}
-            className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${isActive ? 'bg-white/[0.02]' : ''}`}
+            className={`flex items-center gap-2 px-4 py-2 transition-colors ${isActive ? 'bg-gray-50' : ''}`}
           >
-            <div className={`w-1 h-1 rounded-full shrink-0 ${isActive ? act.config.dot : 'bg-white/10'}`} />
             {isActive ? (
-              <Loader2 className={`w-3 h-3 shrink-0 animate-spin ${act.config.color}`} />
+              <Loader2 className={`w-3.5 h-3.5 shrink-0 animate-spin ${act.config.color}`} />
             ) : isDone ? (
-              <Check className="w-3 h-3 shrink-0 text-green-400/40" />
+              <Check className="w-3.5 h-3.5 shrink-0 text-green-400" />
             ) : isFailed ? (
-              <X className="w-3 h-3 shrink-0 text-red-400/50" />
+              <X className="w-3.5 h-3.5 shrink-0 text-red-400" />
             ) : (
-              <Icon className={`w-3 h-3 shrink-0 ${act.config.color}`} />
+              <Icon className={`w-3.5 h-3.5 shrink-0 ${act.config.color}`} />
             )}
-            <span className="font-mono text-[9px] text-white/30 shrink-0">{act.config.label}</span>
-            <span className="font-mono text-[11px] text-white/45 truncate flex-1">{act.path}</span>
+            <span className={`text-xs shrink-0 ${act.config.color}`}>{act.config.label}</span>
+            <span className="text-xs text-gray-500 truncate flex-1">{act.path}</span>
           </div>
         );
       })}

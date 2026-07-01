@@ -8,7 +8,6 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Get the user's OAuth token from the GitHub connector
     let accessToken;
     try {
       const connection = await base44.asServiceRole.connectors.getCurrentAppUserConnection(CONNECTOR_ID);
@@ -51,8 +50,27 @@ Deno.serve(async (req) => {
     const safeError = async (res, fallback) => {
       const text = await res.text();
       let msg = fallback;
-      try { msg = JSON.parse(text).message || msg; } catch { if (text) msg = text.substring(0, 200); }
-      return Response.json({ error: msg }, { status: res.status });
+      let detail = null;
+      try {
+        const parsed = JSON.parse(text);
+        msg = parsed.message || msg;
+        detail = parsed;
+      } catch { if (text) msg = text.substring(0, 200); }
+
+      // Detect permission/scope issues
+      if (res.status === 403) {
+        if (msg.includes('Resource not accessible') || msg.includes('insufficient')) {
+          return Response.json({
+            error: 'PERMISSION_DENIED',
+            message: 'Your GitHub connection does not have write access to this repository. Please reconnect your GitHub account with the "repo" scope enabled.',
+          }, { status: 403 });
+        }
+        if (msg.includes('rate limit')) {
+          return Response.json({ error: 'RATE_LIMITED', message: 'GitHub API rate limit reached. Try again later.' }, { status: 429 });
+        }
+      }
+
+      return Response.json({ error: msg, status: res.status }, { status: res.status });
     };
 
     if (operation === 'read') {

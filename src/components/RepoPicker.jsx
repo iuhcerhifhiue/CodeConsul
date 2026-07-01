@@ -86,61 +86,61 @@ export default function RepoPicker({ onClose, onConnected }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-      <div className="bg-[#0D1117] border border-white/10 rounded-xl p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md shadow-xl">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="font-display text-lg font-bold text-white">Connect a Repo</h2>
-          <button onClick={onClose} className="text-white/30 hover:text-white transition-colors">
+          <h2 className="font-heading text-lg font-bold text-gray-900">Connect a Repo</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-900 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {checkingAuth ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin text-cyan-400/50" />
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
           </div>
         ) : !githubConnected ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-orange-400/5 border border-orange-400/20 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-orange-400 shrink-0" />
-              <p className="font-mono text-xs text-white/60">
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+              <p className="text-sm text-amber-700">
                 Connect your GitHub account so Oikos can read and write to your repositories.
               </p>
             </div>
             <button
               onClick={handleConnectGithub}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white text-black rounded-lg font-mono text-sm font-semibold hover:bg-white/90 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
             >
               <Github className="w-4 h-4" />
               Connect GitHub Account
               <ArrowRight className="w-4 h-4" />
             </button>
-            <p className="font-mono text-[10px] text-white/20 text-center">
+            <p className="text-xs text-gray-400 text-center">
               One-time connection. Then paste any repo URL.
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            <label className="font-mono text-[10px] text-white/40 uppercase tracking-wider">GitHub Repository URL</label>
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">GitHub Repository URL</label>
             <div className="relative">
-              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 value={repoUrl}
                 onChange={(e) => { setRepoUrl(e.target.value); setError(''); }}
                 placeholder="https://github.com/owner/repo"
-                className="w-full bg-black/30 border border-white/10 rounded-lg pl-10 pr-4 py-3 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/50 transition-colors"
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-gray-900 focus:bg-white transition-colors"
                 onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
                 autoFocus
                 disabled={connecting}
               />
             </div>
-            {error && <p className="font-mono text-[10px] text-red-400/80 mt-1">{error}</p>}
-            <p className="font-mono text-[10px] text-white/20 mt-1">Paste any repository you have access to</p>
+            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+            <p className="text-xs text-gray-400 mt-1">Paste any repository you have access to</p>
 
             <button
               onClick={handleConnect}
               disabled={!repoUrl.trim() || connecting}
-              className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-3 bg-cyan-400/10 border border-cyan-400/30 rounded-lg font-mono text-sm text-cyan-400 hover:bg-cyan-400/20 transition-colors disabled:opacity-30"
+              className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-30"
             >
               {connecting ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />Cloning repository...</>
