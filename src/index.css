@@ -90,3 +90,30 @@
     @apply bg-background text-foreground font-body;
   }
 }
+
+/* Terminal scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Hide scrollbar arrows */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* Selection */
+::selection {
+  background: rgba(251, 191, 36, 0.15);
+  color: rgba(255, 255, 255, 0.95);
+}
