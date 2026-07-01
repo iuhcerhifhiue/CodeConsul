@@ -12,7 +12,11 @@
     },
     {
       "function_name": "githubWrite",
-      "description": "Read, write, or delete files in the connected GitHub repository. Use operation: 'read' to fetch a file, operation: 'write' to create or update a file with full content, operation: 'delete' to remove a file."
+      "description": "Read, edit, write, or delete files in the connected GitHub repository. operation: 'read' fetches a file; operation: 'edit' applies a targeted patch via { file_path, old_string, new_string } (or an edits[] array) and is PREFERRED for changing existing files; operation: 'write' creates or overwrites a file with full content; operation: 'delete' removes a file. When the task context provides a task branch, pass { branch } so changes land on that branch for review, not the default branch."
+    },
+    {
+      "function_name": "githubSearch",
+      "description": "Search the connected repository on demand. Pass { repo_full_name, query, mode } where mode is 'filename', 'content', or 'auto'. Use this to locate files instead of guessing paths — the project context snapshot may be partial or stale."
     }
   ]
 }
