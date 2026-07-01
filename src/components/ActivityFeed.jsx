@@ -1,9 +1,9 @@
 import { Eye, FilePen, Trash2, Loader2, Check, X, Inbox } from 'lucide-react';
 
 const opConfig = {
-  read: { icon: Eye, label: 'read', color: 'text-blue-500' },
-  write: { icon: FilePen, label: 'write', color: 'text-green-500' },
-  update: { icon: FilePen, label: 'update', color: 'text-amber-500' },
+  read: { icon: Eye, label: 'read', color: 'text-gray-500' },
+  write: { icon: FilePen, label: 'write', color: 'text-black font-bold' },
+  update: { icon: FilePen, label: 'update', color: 'text-black font-bold' },
   delete: { icon: Trash2, label: 'delete', color: 'text-red-500' },
 };
 
@@ -49,19 +49,19 @@ export default function ActivityFeed({ messages }) {
         return (
           <div
             key={i}
-            className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${isActive ? 'bg-indigo-50/50' : ''} hover:bg-gray-50`}
+            className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${isActive ? 'bg-[#FFFBEA]' : ''} hover:bg-gray-50`}
           >
             {isActive ? (
-              <Loader2 className={`w-3 h-3 shrink-0 animate-spin ${act.config.color}`} />
+              <Loader2 className="w-3 h-3 shrink-0 animate-spin text-black" />
             ) : isDone ? (
-              <Check className="w-3 h-3 shrink-0 text-green-400" />
+              <Check className="w-3 h-3 shrink-0 text-black" />
             ) : isFailed ? (
-              <X className="w-3 h-3 shrink-0 text-red-400" />
+              <X className="w-3 h-3 shrink-0 text-red-500" />
             ) : (
               <Icon className={`w-3 h-3 shrink-0 ${act.config.color}`} />
             )}
-            <span className={`text-[11px] font-mono shrink-0 ${act.config.color}`}>{act.config.label}</span>
-            <span className="text-[11px] text-gray-500 truncate flex-1 font-mono">{shortPath}</span>
+            <span className={`text-[11px] shrink-0 ${act.config.color}`}>{act.config.label}</span>
+            <span className="text-[11px] text-gray-600 truncate flex-1">{shortPath}</span>
           </div>
         );
       })}

@@ -5,7 +5,6 @@ import { ArrowLeft, Send, Github, FileCode, GitBranch, Loader2, Activity, Folder
 import AgentTray from '@/components/AgentTray';
 import ChatMessages from '@/components/ChatMessages';
 import ActivityFeed from '@/components/ActivityFeed';
-import Logo from '@/components/Logo';
 
 export default function Workspace() {
   const { projectId } = useParams();
@@ -149,13 +148,10 @@ export default function Workspace() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center font-mono">
         <div className="flex flex-col items-center gap-3">
-          <Logo size={36} />
-          <div className="flex items-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
-            <span className="text-sm text-gray-400">Loading workspace...</span>
-          </div>
+          <Loader2 className="w-6 h-6 animate-spin text-black" />
+          <span className="text-sm text-gray-400">Loading workspace...</span>
         </div>
       </div>
     );
@@ -165,37 +161,34 @@ export default function Workspace() {
   const opCount = messages.filter(m => m.tool_calls?.length).reduce((n, m) => n + m.tool_calls.length, 0);
 
   return (
-    <div className="h-screen flex flex-col bg-[#fafafa] text-gray-900">
-      {/* Top accent bar */}
-      <div className="h-0.5 bg-gradient-to-r from-indigo-500 to-violet-500 shrink-0" />
+    <div className="h-screen flex flex-col bg-white text-black font-mono">
+      {/* Top border accent */}
+      <div className="h-1 bg-editorial shrink-0" />
 
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-gray-200 bg-white/80 backdrop-blur-xl shrink-0">
-        <Link to="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors shrink-0">
-          <Logo size={20} />
-          <span className="text-sm font-heading font-semibold text-gray-700 hidden sm:block">Consul</span>
-        </Link>
-        <div className="w-px h-5 bg-gray-200 hidden sm:block" />
-        <Link to="/dashboard" className="text-gray-400 hover:text-gray-900 transition-colors shrink-0">
+      <header className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-black bg-white shrink-0">
+        <Link to="/" className="font-bold text-base tracking-tight shrink-0">Consul</Link>
+        <div className="w-px h-4 bg-black shrink-0" />
+        <Link to="/dashboard" className="text-gray-400 hover:text-black transition-colors shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex items-center gap-2 min-w-0">
-          <Github className="w-4 h-4 text-gray-500 shrink-0" />
-          <span className="text-sm font-medium text-gray-800 truncate">{project?.repo_full_name}</span>
+          <Github className="w-4 h-4 shrink-0" />
+          <span className="text-sm font-bold truncate">{project?.repo_full_name}</span>
         </div>
         {project?.stack && (
           <>
             <span className="text-gray-300 hidden sm:block">·</span>
-            <span className="text-xs text-indigo-600 truncate hidden sm:block bg-indigo-50 px-2 py-0.5 rounded-md font-medium">{project.stack}</span>
+            <span className="text-xs text-black bg-editorial px-2 py-0.5 rounded font-bold hidden sm:block">{project.stack}</span>
           </>
         )}
         <div className="ml-auto flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-50 border border-gray-100">
-            <GitBranch className="w-3 h-3 text-gray-400" />
-            <span className="text-xs text-gray-500 font-mono">main</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-black">
+            <GitBranch className="w-3 h-3" />
+            <span className="text-xs">main</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse-ring" />
+            <div className="w-2 h-2 rounded-full bg-editorial" />
             <span className="text-xs text-gray-400 hidden sm:block">connected</span>
           </div>
         </div>
@@ -204,31 +197,31 @@ export default function Workspace() {
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 border-r border-gray-200 hidden md:flex flex-col bg-white shrink-0">
+        <aside className="w-64 border-r border-black hidden md:flex flex-col bg-white shrink-0">
           {/* Tabs */}
-          <div className="flex border-b border-gray-100 shrink-0">
+          <div className="flex border-b border-black shrink-0">
             <button
               onClick={() => setSidebarTab('activity')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
-                sidebarTab === 'activity' ? 'text-gray-900 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-gray-600'
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors ${
+                sidebarTab === 'activity' ? 'text-black bg-editorial' : 'text-gray-400 hover:text-black'
               }`}
             >
               <Activity className="w-3.5 h-3.5" />
-              Activity
+              ACTIVITY
               {opCount > 0 && (
-                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{opCount}</span>
+                <span className="text-[10px] bg-black text-white px-1.5 rounded-full">{opCount}</span>
               )}
             </button>
             <button
               onClick={() => setSidebarTab('files')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors ${
-                sidebarTab === 'files' ? 'text-gray-900 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-gray-600'
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors ${
+                sidebarTab === 'files' ? 'text-black bg-editorial' : 'text-gray-400 hover:text-black'
               }`}
             >
               <FolderTree className="w-3.5 h-3.5" />
-              Files
+              FILES
               {files.length > 0 && (
-                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 rounded-full">{files.length}</span>
+                <span className="text-[10px] bg-black text-white px-1.5 rounded-full">{files.length}</span>
               )}
             </button>
           </div>
@@ -244,9 +237,9 @@ export default function Workspace() {
                 {files.length > 0 ? (
                   <div className="py-1">
                     {files.map((path, i) => (
-                      <div key={i} className="flex items-center gap-1.5 px-3 py-1 hover:bg-gray-50 transition-colors group">
-                        <FileCode className="w-3 h-3 text-gray-300 shrink-0 group-hover:text-indigo-400" />
-                        <span className="text-[11px] text-gray-500 truncate font-mono">{path}</span>
+                      <div key={i} className="flex items-center gap-1.5 px-3 py-1 hover:bg-[#FFFBEA] transition-colors group">
+                        <FileCode className="w-3 h-3 text-gray-300 shrink-0 group-hover:text-black" />
+                        <span className="text-[11px] text-gray-600 truncate">{path}</span>
                       </div>
                     ))}
                   </div>
@@ -261,21 +254,21 @@ export default function Workspace() {
         </aside>
 
         {/* Chat */}
-        <main ref={scrollRef} className="flex-1 overflow-y-auto bg-gradient-to-b from-white to-[#fafafa]">
+        <main ref={scrollRef} className="flex-1 overflow-y-auto bg-white">
           <ChatMessages messages={messages} isStreaming={isStreaming} />
         </main>
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 bg-white/80 backdrop-blur-xl px-4 md:px-6 py-3 shrink-0">
+      <div className="border-t border-black bg-white px-4 md:px-6 py-3 shrink-0">
         {error && (
-          <div className="mb-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm">
+          <div className="mb-2 px-4 py-2 rounded border border-black text-red-600 text-sm bg-[#FFFBEA]">
             {error}
           </div>
         )}
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
-          <div className={`flex items-end gap-2 rounded-xl border transition-all ${isStreaming ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-white focus-within:border-indigo-400 focus-within:shadow-sm'}`}>
-            <span className="font-mono text-[13px] text-indigo-500 pl-4 py-3 select-none shrink-0">›</span>
+          <div className={`flex items-end gap-2 rounded-md border-2 transition-all ${isStreaming ? 'border-gray-200 bg-gray-50' : 'border-black bg-white focus-within:border-editorial'}`}>
+            <span className="text-[13px] text-black pl-4 py-3 select-none shrink-0 font-bold">›</span>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -286,7 +279,7 @@ export default function Workspace() {
                 }
               }}
               placeholder={isStreaming ? 'Oikos is working...' : 'Ask Oikos to build something...'}
-              className="flex-1 bg-transparent font-mono text-[13px] text-gray-900 placeholder-gray-300 outline-none resize-none py-3 pr-4 min-h-[20px] max-h-32"
+              className="flex-1 bg-transparent text-[13px] text-black placeholder-gray-300 outline-none resize-none py-3 pr-4 min-h-[20px] max-h-32"
               disabled={isStreaming}
               autoFocus
               rows={1}
@@ -294,14 +287,14 @@ export default function Workspace() {
             <button
               type="submit"
               disabled={isStreaming || !input.trim()}
-              className="m-1.5 p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white hover:opacity-90 disabled:opacity-20 disabled:hover:opacity-20 transition-opacity shrink-0"
+              className="m-1.5 p-2 rounded bg-black text-white hover:bg-gray-800 disabled:opacity-20 disabled:hover:opacity-20 transition-opacity shrink-0"
             >
               {isStreaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </button>
           </div>
           <div className="flex items-center justify-between px-1 mt-1.5">
-            <span className="text-[11px] text-gray-300 font-mono">enter to send · shift+enter for newline</span>
-            <span className="text-[11px] text-gray-300 font-mono hidden sm:block">read &amp; write access</span>
+            <span className="text-[11px] text-gray-300">enter to send · shift+enter for newline</span>
+            <span className="text-[11px] text-gray-300 hidden sm:block">read &amp; write access</span>
           </div>
         </form>
       </div>
