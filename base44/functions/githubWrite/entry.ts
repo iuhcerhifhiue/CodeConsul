@@ -1,20 +1,19 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-const CONNECTOR_ID = '6a242ab8748831bf367aed86';
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    let accessToken;
-    try {
-      const connection = await base44.asServiceRole.connectors.getCurrentAppUserConnection(CONNECTOR_ID);
-      accessToken = connection.accessToken;
-    } catch {
-      return Response.json({ error: 'GITHUB_NOT_CONNECTED', message: 'Connect your GitHub account first' }, { status: 403 });
-    }
+    const accessToken = Deno.env.get('GITHUB_TOKEN');
+    if (!accessToken) return Response.json({ error: 'GITHUB_TOKEN not configured' }, { status: 500 });
+
+    const headers = {
+      'Authorization': `token ${accessToken}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'Consul-Oikos',
+    };
 
     const body = await req.json();
     const { operation, repo_full_name, file_path, content, commit_message, branch } = body;
@@ -22,12 +21,6 @@ Deno.serve(async (req) => {
     if (!repo_full_name || !file_path) {
       return Response.json({ error: 'repo_full_name and file_path are required' }, { status: 400 });
     }
-
-    const headers = {
-      'Authorization': `token ${accessToken}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Consul-Oikos',
-    };
 
     const [owner, repo] = repo_full_name.split('/');
     const refParam = branch ? `?ref=${branch}` : '';
@@ -50,26 +43,10 @@ Deno.serve(async (req) => {
     const safeError = async (res, fallback) => {
       const text = await res.text();
       let msg = fallback;
-      let detail = null;
       try {
         const parsed = JSON.parse(text);
         msg = parsed.message || msg;
-        detail = parsed;
-      } catch { if (text) msg = text.substring(0, 200); }
-
-      // Detect permission/scope issues
-      if (res.status === 403) {
-        if (msg.includes('Resource not accessible') || msg.includes('insufficient')) {
-          return Response.json({
-            error: 'PERMISSION_DENIED',
-            message: 'Your GitHub connection does not have write access to this repository. Please reconnect your GitHub account with the "repo" scope enabled.',
-          }, { status: 403 });
-        }
-        if (msg.includes('rate limit')) {
-          return Response.json({ error: 'RATE_LIMITED', message: 'GitHub API rate limit reached. Try again later.' }, { status: 429 });
-        }
-      }
-
+      } catch { if (text) msg = text.substring(0, 300); }
       return Response.json({ error: msg, status: res.status }, { status: res.status });
     };
 

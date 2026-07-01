@@ -4,32 +4,29 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { accessToken } = await base44.asServiceRole.connectors.getCurrentAppUserConnection('6a242ab8748831bf367aed86');
+    const accessToken = Deno.env.get('GITHUB_TOKEN');
+    if (!accessToken) return Response.json({ error: 'GITHUB_TOKEN not configured' }, { status: 500 });
 
-    const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/vnd.github.v3+json',
-      },
-    });
+    const headers = {
+      'Authorization': `token ${accessToken}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'Consul-Oikos',
+    };
 
-    if (!response.ok) {
-      return Response.json({ error: 'Failed to fetch repos', status: response.status }, { status: response.status });
-    }
+    const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=50&type=all', { headers });
+    if (!response.ok) return Response.json({ error: 'Failed to fetch repositories' }, { status: response.status });
 
-    const repos = await response.json();
-    return Response.json({
-      repos: repos.map((r) => ({
-        name: r.full_name,
-        url: r.html_url,
-        description: r.description,
-        language: r.language,
-      })),
-    });
+    const data = await response.json();
+    const repos = data.map((repo) => ({
+      name: repo.full_name,
+      url: repo.html_url,
+      private: repo.private,
+      updated_at: repo.updated_at,
+    }));
+
+    return Response.json({ repos });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

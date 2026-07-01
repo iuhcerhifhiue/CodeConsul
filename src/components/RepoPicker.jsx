@@ -1,57 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, Github, Link2, AlertCircle } from 'lucide-react';
-
-const GITHUB_CONNECTOR_ID = '6a242ab8748831bf367aed86';
+import { X, Github, Loader2, Link2, AlertCircle } from 'lucide-react';
 
 export default function RepoPicker({ onClose, onConnected }) {
   const [repoUrl, setRepoUrl] = useState('');
   const [connecting, setConnecting] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [githubConnected, setGithubConnected] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    checkGithubConnection();
-  }, []);
-
-  const checkGithubConnection = async () => {
-    try {
-      await base44.functions.invoke('githubRepos', {});
-      setGithubConnected(true);
-    } catch {
-      setGithubConnected(false);
-    } finally {
-      setCheckingAuth(false);
-    }
-  };
-
-  const handleConnectGithub = async () => {
-    // Open popup synchronously BEFORE any async call to avoid popup blockers
-    const popup = window.open('about:blank', '_blank', 'width=600,height=750');
-    try {
-      const redirectUrl = await base44.connectors.connectAppUser(GITHUB_CONNECTOR_ID);
-      if (popup) {
-        popup.location.href = redirectUrl;
-      } else {
-        // Popup was blocked — fallback to full-page redirect
-        window.location.href = redirectUrl;
-        return;
-      }
-
-      // Poll for popup close, then re-check connection
-      const timer = setInterval(() => {
-        if (!popup || popup.closed) {
-          clearInterval(timer);
-          setCheckingAuth(true);
-          checkGithubConnection();
-        }
-      }, 500);
-    } catch (err) {
-      if (popup) popup.close();
-      setError('Failed to start GitHub connection. Please try again.');
-    }
-  };
 
   const parseRepoName = (input) => {
     let val = input.trim();
@@ -95,7 +49,8 @@ export default function RepoPicker({ onClose, onConnected }) {
           });
         }
       } catch (err) {
-        if (err?.response?.data?.error) setError(err.response.data.error);
+        const msg = err?.response?.data?.error || err?.message;
+        if (msg) setError(msg);
       }
 
       onConnected?.();
@@ -117,60 +72,40 @@ export default function RepoPicker({ onClose, onConnected }) {
           </button>
         </div>
 
-        {checkingAuth ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">GitHub Repository URL</label>
+          <div className="relative">
+            <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={repoUrl}
+              onChange={(e) => { setRepoUrl(e.target.value); setError(''); }}
+              placeholder="https://github.com/owner/repo"
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-gray-900 focus:bg-white transition-colors"
+              onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+              autoFocus
+              disabled={connecting}
+            />
           </div>
-        ) : !githubConnected ? (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-700">
-                Connect your GitHub account so Oikos can read and write to your repositories.
-              </p>
+          {error && (
+            <div className="flex items-start gap-2 mt-2 p-2.5 bg-red-50 border border-red-100 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-600">{error}</p>
             </div>
-            <button
-              onClick={handleConnectGithub}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-            >
-              <Github className="w-4 h-4" />
-              Connect GitHub Account
-            </button>
-            <p className="text-xs text-gray-400 text-center">
-              Opens in a new window. Come back here after authorizing.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">GitHub Repository URL</label>
-            <div className="relative">
-              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                value={repoUrl}
-                onChange={(e) => { setRepoUrl(e.target.value); setError(''); }}
-                placeholder="https://github.com/owner/repo"
-                className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-gray-900 focus:bg-white transition-colors"
-                onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
-                autoFocus
-                disabled={connecting}
-              />
-            </div>
-            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-            <p className="text-xs text-gray-400 mt-1">Paste any repository you have access to</p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">Paste any public GitHub repository URL</p>
 
-            <button
-              onClick={handleConnect}
-              disabled={!repoUrl.trim() || connecting}
-              className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-30"
-            >
-              {connecting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" />Indexing repository...</>
-              ) : (
-                <><Github className="w-4 h-4" />Connect Repository</>
-              )}
-            </button>
-          </div>
-        )}
+          <button
+            onClick={handleConnect}
+            disabled={!repoUrl.trim() || connecting}
+            className="w-full mt-5 flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-30"
+          >
+            {connecting ? (
+              <><Loader2 className="w-4 h-4 animate-spin" />Indexing repository...</>
+            ) : (
+              <><Github className="w-4 h-4" />Connect Repository</>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

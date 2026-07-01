@@ -103,7 +103,7 @@ export default function Landing() {
             Connect your first repo and task Oikos in under a minute.
           </p>
           <Link
-            to="/register"
+            to="/dashboard"
             className="inline-flex items-center gap-2 px-6 py-3.5 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-all mt-8"
           >
             Get started free

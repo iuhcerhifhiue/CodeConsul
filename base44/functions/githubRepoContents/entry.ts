@@ -1,23 +1,19 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-const CONNECTOR_ID = '6a242ab8748831bf367aed86';
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Get the user's OAuth token — works for both public and private repos
-    let accessToken;
-    let headers = { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Consul-Oikos' };
-    try {
-      const connection = await base44.asServiceRole.connectors.getCurrentAppUserConnection(CONNECTOR_ID);
-      accessToken = connection.accessToken;
-      headers['Authorization'] = `token ${accessToken}`;
-    } catch {
-      // No connection — will only be able to access public repos unauthenticated
-    }
+    const accessToken = Deno.env.get('GITHUB_TOKEN');
+    if (!accessToken) return Response.json({ error: 'GITHUB_TOKEN not configured' }, { status: 500 });
+
+    const headers = {
+      'Authorization': `token ${accessToken}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'Consul-Oikos',
+    };
 
     const body = await req.json();
     const { repo_full_name } = body;
@@ -28,7 +24,7 @@ Deno.serve(async (req) => {
     const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     if (!repoResponse.ok) {
       const text = await repoResponse.text();
-      let msg = 'Repository not found. Check the URL and make sure you have access.';
+      let msg = 'Repository not found or not accessible.';
       try { msg = JSON.parse(text).message || msg; } catch {}
       return Response.json({ error: msg }, { status: repoResponse.status });
     }
