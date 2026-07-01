@@ -1,4 +1,6 @@
 {
+  "name": "User",
+  "type": "object",
   "properties": {
     "role": {
       "type": "string",
@@ -7,11 +9,20 @@
         "admin",
         "user"
       ]
+    },
+    "plan": {
+      "type": "string",
+      "description": "The user's subscription plan determining available agents",
+      "enum": [
+        "free",
+        "starter",
+        "pro",
+        "builder"
+      ],
+      "default": "free"
     }
   },
   "required": [
     "role"
-  ],
-  "name": "User",
-  "type": "object"
+  ]
 }

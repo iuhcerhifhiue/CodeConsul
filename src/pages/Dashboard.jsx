@@ -30,9 +30,14 @@ export default function Dashboard() {
       <nav className="sticky top-0 z-50 border-b border-black bg-white">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between px-6 md:px-10 py-4">
           <Link to="/" className="font-bold text-xl tracking-tight">Consul</Link>
-          <Link to="/" className="text-sm text-gray-500 hover:text-black hover:underline transition-colors">
-            ← Home
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/plans" className="text-sm text-gray-500 hover:text-black hover:underline transition-colors">
+              Plans
+            </Link>
+            <Link to="/" className="text-sm text-gray-500 hover:text-black hover:underline transition-colors">
+              ← Home
+            </Link>
+          </div>
         </div>
       </nav>
 

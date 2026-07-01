@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Workspace from './pages/Workspace';
+import Plans from './pages/Plans';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -47,6 +48,7 @@ const AuthenticatedApp = () => {
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace/:projectId" element={<Workspace />} />
+        <Route path="/plans" element={<Plans />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
