@@ -14,22 +14,21 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'repo_full_name is required' }, { status: 400 });
     }
 
-    const { accessToken } = await base44.asServiceRole.connectors.getCurrentAppUserConnection('6a242ab8748831bf367aed86');
     const [owner, repo] = repo_full_name.split('/');
 
-    // Get repo info for default branch
+    // Get repo info for default branch (public API, no auth needed)
     const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/vnd.github.v3+json' },
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
     });
     if (!repoResponse.ok) {
-      return Response.json({ error: 'Failed to fetch repo info' }, { status: repoResponse.status });
+      return Response.json({ error: 'Repository not found. Check the URL and make sure it is public.' }, { status: repoResponse.status });
     }
     const repoInfo = await repoResponse.json();
     const defaultBranch = repoInfo.default_branch;
 
     // Get recursive file tree
     const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, {
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/vnd.github.v3+json' },
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
     });
     if (!treeResponse.ok) {
       return Response.json({ error: 'Failed to fetch file tree' }, { status: treeResponse.status });
@@ -62,7 +61,7 @@ Deno.serve(async (req) => {
     for (const path of filesToFetch) {
       try {
         const contentResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${defaultBranch}`, {
-          headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/vnd.github.v3+json' },
+          headers: { 'Accept': 'application/vnd.github.v3+json' },
         });
         if (contentResponse.ok) {
           const contentData = await contentResponse.json();
