@@ -13,8 +13,8 @@ export default function Landing() {
             <Link to="/login" className="text-sm hover:underline">Sign in</Link>
             <Link
               to="/register"
-              className="text-sm font-medium bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors"
-            >
+              className="text-sm font-medium bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors">
+              
               Get started
             </Link>
           </div>
@@ -28,7 +28,7 @@ export default function Landing() {
             <p className="text-xs font-bold tracking-[0.2em] text-editorial mb-8">01 — AUTONOMOUS CODING AGENT</p>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight">
               DEPLOY AN AI ENGINEER THAT ACTUALLY{' '}
-              <span className="bg-editorial px-2 py-0.5">SHIPS CODE.</span>
+              <span className="bg-editorial px-2 py-0.5 text-5xl">SHIPS CODE.</span>
             </h1>
             <p className="text-base text-gray-600 mt-8 max-w-md leading-relaxed">
               Paste a GitHub URL. Describe what you want built. Oikos reads your codebase, writes production-ready files, and commits directly — no hand-holding required.
@@ -36,14 +36,14 @@ export default function Landing() {
             <div className="flex items-center gap-3 mt-10">
               <Link
                 to="/dashboard"
-                className="group inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors"
-              >
+                className="group inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
+                
                 Start building <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
               <Link
                 to="/register"
-                className="inline-flex items-center gap-2 px-6 py-3 border border-black rounded-md text-sm font-medium hover:bg-black hover:text-white transition-colors"
-              >
+                className="inline-flex items-center gap-2 px-6 py-3 border border-black rounded-md text-sm font-medium hover:bg-black hover:text-white transition-colors">
+                
                 Create account
               </Link>
             </div>
@@ -128,11 +128,11 @@ export default function Landing() {
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-12">THREE STEPS. ZERO FRICTION.</h2>
           <div className="grid md:grid-cols-3 gap-px bg-black border border-black rounded-lg overflow-hidden">
             {[
-              { step: '01', icon: GitBranch, title: 'Paste a URL', desc: 'Drop any GitHub repository link. Oikos indexes the file tree and key files in seconds.' },
-              { step: '02', icon: Bot, title: 'Describe the task', desc: 'Tell Oikos what to build in plain English. It reads relevant files and plans the approach.' },
-              { step: '03', icon: ArrowRight, title: 'Review the commits', desc: 'Oikos writes complete files and commits them directly. Watch every operation in real time.' },
-            ].map((s) => (
-              <div key={s.step} className="bg-white p-8">
+            { step: '01', icon: GitBranch, title: 'Paste a URL', desc: 'Drop any GitHub repository link. Oikos indexes the file tree and key files in seconds.' },
+            { step: '02', icon: Bot, title: 'Describe the task', desc: 'Tell Oikos what to build in plain English. It reads relevant files and plans the approach.' },
+            { step: '03', icon: ArrowRight, title: 'Review the commits', desc: 'Oikos writes complete files and commits them directly. Watch every operation in real time.' }].
+            map((s) =>
+            <div key={s.step} className="bg-white p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <s.icon className="w-5 h-5" />
                   <span className="text-5xl font-bold text-black/10">{s.step}</span>
@@ -140,7 +140,7 @@ export default function Landing() {
                 <h3 className="text-xl font-bold mb-3">{s.title}</h3>
                 <p className="text-sm text-gray-600 leading-relaxed">{s.desc}</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </section>
@@ -157,8 +157,8 @@ export default function Landing() {
             </p>
             <Link
               to="/dashboard"
-              className="group inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors mt-8"
-            >
+              className="group inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors mt-8">
+              
               Get started free <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
@@ -182,6 +182,6 @@ export default function Landing() {
           </div>
         </div>
       </footer>
-    </div>
-  );
+    </div>);
+
 }
