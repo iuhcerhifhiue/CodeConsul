@@ -1,0 +1,31 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "repo_name": {
+      "type": "string"
+    },
+    "repo_full_name": {
+      "type": "string"
+    },
+    "repo_url": {
+      "type": "string"
+    },
+    "stack": {
+      "type": "string"
+    },
+    "architecture_notes": {
+      "type": "string"
+    },
+    "key_decisions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "repo_name",
+    "repo_full_name"
+  ]
+}
