@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { ArrowLeft, Send, Github, Loader2, Crown, Layers, GitPullRequest } from 'lucide-react';
+import { ArrowLeft, Send, Github, Loader2, Crown, Layers, GitPullRequest, CheckCircle2, AlertCircle } from 'lucide-react';
 import { PLANS } from '@/lib/plans';
 import ChatMessages from '@/components/ChatMessages';
 import AgentPanel from '@/components/AgentPanel';
@@ -22,6 +22,8 @@ export default function Workspace() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [prUrl, setPrUrl] = useState('');
+  const [verification, setVerification] = useState(null);
+  const [isVerifying, setIsVerifying] = useState(false);
   const unsubRefs = useRef([]);
 
   useEffect(() => {
@@ -194,6 +196,24 @@ export default function Workspace() {
     return Array.from(map.entries()).map(([path, op]) => ({ path, op }));
   };
 
+  // Ask the Consul verify service to clone the branch and run the repo's real
+  // test/typecheck/build command. Returns null when there's nothing to verify
+  // against; on a service/network failure, returns a synthetic "skipped" result
+  // rather than throwing, so a missing CONSUL_VERIFY_URL degrades gracefully.
+  const verifyOnBranch = async (branch) => {
+    if (!project?.repo_full_name || !branch) return null;
+    try {
+      const res = await base44.functions.invoke('verifyBranch', {
+        repo_full_name: project.repo_full_name,
+        branch,
+      });
+      return res.data || null;
+    } catch (err) {
+      console.error('Verification call failed:', err);
+      return { ran: false, passed: false, summary: err.message || 'verification service unreachable', failures: [] };
+    }
+  };
+
   const pollForCeoResponse = (convId, minMsgCount) => {
     return new Promise((resolve, reject) => {
       let attempts = 0;
@@ -308,6 +328,8 @@ export default function Workspace() {
     setError('');
     setNotice('');
     setPrUrl('');
+    setVerification(null);
+    setIsVerifying(false);
     setIsOrchestrating(true);
 
     // Clear previous specialist subscriptions
@@ -364,26 +386,88 @@ export default function Workspace() {
         }
       }
 
-      // Execute in dependency-ordered waves, accumulating modified files so later
-      // waves know what earlier agents changed.
+      // Execute in dependency-ordered waves, accumulating modified files (with the
+      // agent that touched each one, last writer wins) so later waves — and a
+      // possible repair pass — know what earlier agents changed and who to ask.
       const waves = orderIntoWaves(validAssignments);
       const modifiedFiles = [];
+      const recordTouched = (agent, touched) => {
+        touched.forEach((f) => {
+          const existing = modifiedFiles.find((m) => m.path === f.path);
+          if (existing) {
+            existing.op = f.op;
+            existing.agent = agent;
+          } else {
+            modifiedFiles.push({ path: f.path, op: f.op, agent });
+          }
+        });
+      };
       for (const wave of waves) {
         const results = await Promise.all(wave.map((a) => runSpecialist(a, branch, [...modifiedFiles])));
-        results.flat().forEach((f) => {
-          if (!modifiedFiles.some((m) => m.path === f.path)) modifiedFiles.push(f);
-        });
+        wave.forEach((a, i) => recordTouched(a.agent, results[i] || []));
       }
 
-      // Open a PR for the user to review once the specialists finish.
+      // Verify on the branch: clone it, run the repo's real test/typecheck/build
+      // command, and report pass/fail — this is the step that turns "the agents
+      // said they're done" into "the code actually works." On failure, dispatch
+      // one bounded repair pass to the agent(s) whose files are implicated, then
+      // re-verify once and report the final state.
+      let verificationResult = null;
+      if (branch && project?.repo_full_name && modifiedFiles.length) {
+        setIsVerifying(true);
+        verificationResult = await verifyOnBranch(branch);
+
+        if (verificationResult?.ran && !verificationResult?.passed) {
+          const failingPaths = new Set((verificationResult.failures || []).map((f) => f.file).filter(Boolean));
+          const allAgents = [...new Set(modifiedFiles.map((f) => f.agent).filter(Boolean))];
+          const implicatedAgents = failingPaths.size
+            ? [...new Set(modifiedFiles.filter((f) => failingPaths.has(f.path)).map((f) => f.agent).filter(Boolean))]
+            : [];
+          const repairAgents = (implicatedAgents.length ? implicatedAgents : allAgents).filter((a) =>
+            allowedAgents.includes(a),
+          );
+
+          if (repairAgents.length) {
+            setNotice((n) => `${n ? n + ' ' : ''}Verification failed — dispatching a repair pass to ${repairAgents.join(', ')}.`);
+            const failureText =
+              (verificationResult.failures || [])
+                .slice(0, 10)
+                .map((f) => `- ${f.file ? f.file + ': ' : ''}${f.label} — ${f.detail}`)
+                .join('\n') || verificationResult.summary;
+
+            const repairAssignments = repairAgents.map((agent) => ({
+              agent,
+              task: `Fix this verification failure on branch "${branch}". Re-read the current file state first — it may differ from what you last wrote.\n\n${failureText}`,
+              depends_on: [],
+            }));
+            const repairResults = await Promise.all(
+              repairAssignments.map((a) => runSpecialist(a, branch, [...modifiedFiles])),
+            );
+            repairAssignments.forEach((a, i) => recordTouched(a.agent, repairResults[i] || []));
+
+            const reverified = await verifyOnBranch(branch);
+            verificationResult = reverified ? { ...reverified, repaired: true } : verificationResult;
+          }
+        }
+        setIsVerifying(false);
+        setVerification(verificationResult);
+      }
+
+      // Open a PR for the user to review once the specialists finish, regardless
+      // of verification outcome — never lose the work, just report the real state.
       if (branch && project?.repo_full_name && modifiedFiles.length) {
         try {
+          const verifyLine = !verificationResult
+            ? ''
+            : verificationResult.ran
+              ? `\nVerification: ${verificationResult.passed ? 'passed' : 'FAILED'}${verificationResult.repaired ? ' (after 1 repair pass)' : ''} — ${verificationResult.summary}`
+              : `\nVerification: skipped — ${verificationResult.summary || 'no verify service configured'}`;
           const res = await base44.functions.invoke('githubPullRequest', {
             operation: 'open',
             repo_full_name: project.repo_full_name,
             branch,
             title: `Consul: ${task.substring(0, 60)}`,
-            pr_body: `Automated changes from the Consul multi-agent platform.\n\nTask: ${task}\n\nFiles changed:\n${modifiedFiles.map((f) => `- ${f.path} (${f.op})`).join('\n')}\n\nReview before merging.`,
+            pr_body: `Automated changes from the Consul multi-agent platform.\n\nTask: ${task}\n${verifyLine}\n\nFiles changed:\n${modifiedFiles.map((f) => `- ${f.path} (${f.op})`).join('\n')}\n\nReview before merging.`,
           });
           if (res.data?.url) setPrUrl(res.data.url);
         } catch (err) {
@@ -473,6 +557,36 @@ export default function Workspace() {
 
           {/* Input */}
           <div className="border-t border-black px-3 py-2 shrink-0 bg-white">
+            {isVerifying && (
+              <div className="mb-2 px-3 py-1.5 rounded border border-gray-300 text-gray-600 text-xs bg-gray-50 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                Running real verification (tests/build) on the branch...
+              </div>
+            )}
+            {verification && verification.ran && (
+              <div className={`mb-2 px-3 py-1.5 rounded border text-xs ${verification.passed ? 'border-black bg-editorial' : 'border-black text-red-600 bg-[#FFFBEA]'}`}>
+                <div className="flex items-center gap-2">
+                  {verification.passed ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                  <span className="font-bold">
+                    {verification.passed ? 'Verified — real tests passed' : 'Verification failed'}
+                    {verification.repaired ? ' (after 1 repair pass)' : ''}
+                  </span>
+                </div>
+                {verification.summary && <p className="mt-1 text-gray-600">{verification.summary}</p>}
+                {!verification.passed && verification.failures?.length > 0 && (
+                  <ul className="mt-1 space-y-0.5">
+                    {verification.failures.slice(0, 5).map((f, i) => (
+                      <li key={i} className="text-gray-500 truncate">{f.file ? `${f.file}: ` : ''}{f.label} — {f.detail}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {verification && !verification.ran && (
+              <div className="mb-2 px-3 py-1.5 rounded border border-gray-300 text-gray-500 text-xs bg-gray-50">
+                Verification skipped — {verification.summary || 'no verify service configured'}
+              </div>
+            )}
             {prUrl && (
               <div className="mb-2 px-3 py-1.5 rounded border border-black text-xs bg-editorial flex items-center gap-2">
                 <GitPullRequest className="w-3.5 h-3.5 shrink-0" />
