@@ -1,4 +1,4 @@
-import { Eye, FilePen, Trash2, Loader2, Check, X } from 'lucide-react';
+import { Eye, FilePen, Trash2, Loader2, Check, X, Inbox } from 'lucide-react';
 
 const opConfig = {
   read: { icon: Eye, label: 'read', color: 'text-blue-500' },
@@ -15,7 +15,7 @@ function parseActivities(messages) {
         let args = {};
         try { args = JSON.parse(tc.arguments_string); } catch {}
         const op = args.operation || 'read';
-        const path = args.file_path || 'unknown';
+        const path = args.file_path || args.path || args.filePath || 'unknown';
         const config = opConfig[op] || opConfig.read;
         activities.push({ config, path, status: tc.status, op });
       });
@@ -29,8 +29,10 @@ export default function ActivityFeed({ messages }) {
 
   if (!activities.length) {
     return (
-      <div className="px-4 py-8 text-center">
+      <div className="px-4 py-12 text-center flex flex-col items-center gap-2">
+        <Inbox className="w-6 h-6 text-gray-200" />
         <p className="text-xs text-gray-400">No operations yet</p>
+        <p className="text-[11px] text-gray-300 max-w-[160px]">Agent activity will appear here as Oikos reads and writes files</p>
       </div>
     );
   }
@@ -42,11 +44,12 @@ export default function ActivityFeed({ messages }) {
         const isActive = ['pending', 'running', 'in_progress'].includes(act.status);
         const isDone = ['completed', 'success'].includes(act.status);
         const isFailed = ['failed', 'error'].includes(act.status);
+        const shortPath = act.path !== 'unknown' ? act.path.split('/').slice(-2).join('/') : 'unknown';
 
         return (
           <div
             key={i}
-            className={`flex items-center gap-2 px-4 py-1.5 transition-colors ${isActive ? 'bg-gray-50' : ''}`}
+            className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${isActive ? 'bg-indigo-50/50' : ''} hover:bg-gray-50`}
           >
             {isActive ? (
               <Loader2 className={`w-3 h-3 shrink-0 animate-spin ${act.config.color}`} />
@@ -58,7 +61,7 @@ export default function ActivityFeed({ messages }) {
               <Icon className={`w-3 h-3 shrink-0 ${act.config.color}`} />
             )}
             <span className={`text-[11px] font-mono shrink-0 ${act.config.color}`}>{act.config.label}</span>
-            <span className="text-[11px] text-gray-500 truncate flex-1 font-mono">{act.path}</span>
+            <span className="text-[11px] text-gray-500 truncate flex-1 font-mono">{shortPath}</span>
           </div>
         );
       })}
