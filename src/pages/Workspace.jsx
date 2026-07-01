@@ -34,8 +34,11 @@ export default function Workspace() {
   }, [conversationId]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (nearBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }
   }, [messages]);
 

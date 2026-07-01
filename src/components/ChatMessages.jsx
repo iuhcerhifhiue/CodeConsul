@@ -1,12 +1,13 @@
 import ReactMarkdown from 'react-markdown';
 import CodeBlock from './CodeBlock';
 import ToolCall from './ToolCall';
+import { Brain, Terminal, Search, CheckCircle2 } from 'lucide-react';
 
 const phaseConfig = {
-  PLAN: { label: 'Planning', color: 'text-blue-600' },
-  EXECUTE: { label: 'Executing', color: 'text-amber-600' },
-  REVIEW: { label: 'Reviewing', color: 'text-purple-600' },
-  DONE: { label: 'Done', color: 'text-green-600' },
+  PLAN: { label: 'Planning', icon: Brain, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+  EXECUTE: { label: 'Executing', icon: Terminal, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+  REVIEW: { label: 'Reviewing', icon: Search, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+  DONE: { label: 'Complete', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
 };
 
 const mdComponents = {
@@ -15,28 +16,29 @@ const mdComponents = {
     const phase = phaseConfig[text];
     if (phase) {
       return (
-        <div className="flex items-center gap-2 mt-4 mb-2">
-          <span className={`text-xs font-semibold uppercase tracking-wider ${phase.color}`}>⟡ {phase.label}</span>
+        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ${phase.bg} ${phase.border} border mt-3 mb-1`}>
+          <phase.icon className={`w-3 h-3 ${phase.color}`} />
+          <span className={`text-[11px] font-semibold uppercase tracking-wide ${phase.color}`}>{phase.label}</span>
         </div>
       );
     }
-    return <h2 className="font-heading font-semibold text-base text-gray-900 mt-5 mb-2">{text}</h2>;
+    return <h2 className="font-heading font-semibold text-sm text-gray-900 mt-3 mb-1">{text}</h2>;
   },
   h3: ({ children }) => {
     const text = String(children);
-    return <h3 className="font-heading font-semibold text-sm text-gray-700 mt-4 mb-1.5">{text}</h3>;
+    return <h3 className="font-heading font-semibold text-[13px] text-gray-700 mt-2.5 mb-1">{text}</h3>;
   },
   code: ({ inline, className, children }) => {
     if (inline) {
-      return <code className="font-mono text-[13px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">{children}</code>;
+      return <code className="font-mono text-[12px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded">{children}</code>;
     }
     const match = /language-(\w+)/.exec(className || '');
     return <CodeBlock code={String(children).replace(/\n$/, '')} language={match ? match[1] : ''} />;
   },
-  p: ({ children }) => <p className="text-[13px] text-gray-700 leading-relaxed my-1.5">{children}</p>,
-  li: ({ children }) => <li className="text-[13px] text-gray-700 leading-relaxed ml-4 list-disc">{children}</li>,
-  ul: ({ children }) => <ul className="my-1.5 space-y-0.5">{children}</ul>,
-  ol: ({ children }) => <ol className="my-1.5 space-y-0.5 list-decimal ml-4">{children}</ol>,
+  p: ({ children }) => <p className="text-[13px] text-gray-700 leading-snug my-1">{children}</p>,
+  li: ({ children }) => <li className="text-[13px] text-gray-700 leading-snug ml-4 list-disc">{children}</li>,
+  ul: ({ children }) => <ul className="my-1 space-y-0.5">{children}</ul>,
+  ol: ({ children }) => <ol className="my-1 space-y-0.5 list-decimal ml-4">{children}</ol>,
   strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
 };
 
@@ -49,19 +51,19 @@ export default function ChatMessages({ messages, isStreaming }) {
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-6 py-20">
-        <div className="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center mb-4">
-          <span className="text-white text-lg font-bold">α</span>
+        <div className="w-11 h-11 rounded-xl bg-gray-900 flex items-center justify-center mb-4">
+          <span className="text-white text-base font-bold">α</span>
         </div>
-        <h2 className="font-heading text-lg font-semibold text-gray-900">Oikos is ready</h2>
-        <p className="text-sm text-gray-500 mt-1.5 max-w-sm">Describe what you want to build and Oikos will read, write, and commit code directly to your repo.</p>
-        <div className="mt-8 flex flex-col gap-1.5 max-w-lg w-full">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1 text-left">Try asking</p>
+        <h2 className="font-heading text-base font-semibold text-gray-900">Oikos is ready</h2>
+        <p className="text-[13px] text-gray-500 mt-1 max-w-sm leading-relaxed">Describe what you want to build and Oikos will read, write, and commit code directly to your repo.</p>
+        <div className="mt-6 flex flex-col gap-1 max-w-lg w-full">
+          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-1 text-left">Try asking</p>
           {[
             'Add JWT authentication with refresh tokens',
             'Create a pagination utility for the API',
             'Add input validation to all routes',
           ].map((s) => (
-            <div key={s} className="text-left px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-default text-[13px] text-gray-600 font-mono">
+            <div key={s} className="text-left px-3 py-1.5 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-default text-[13px] text-gray-600 font-mono">
               <span className="text-gray-300 mr-2">›</span>{s}
             </div>
           ))}
@@ -71,15 +73,15 @@ export default function ChatMessages({ messages, isStreaming }) {
   }
 
   return (
-    <div className="px-4 md:px-8 py-6 space-y-1 max-w-3xl mx-auto font-mono">
+    <div className="px-4 md:px-8 py-4 space-y-0.5 max-w-3xl mx-auto font-mono">
       {messages.map((msg, i) => {
         if (msg.role === 'user') {
           const displayText = extractTask(msg.content);
           return (
-            <div key={i} className="py-2">
+            <div key={i} className="py-1.5">
               <div className="flex gap-2">
                 <span className="text-green-600 select-none shrink-0">›</span>
-                <p className="text-[13px] text-gray-800 leading-relaxed whitespace-pre-wrap">{displayText}</p>
+                <p className="text-[13px] text-gray-800 leading-snug whitespace-pre-wrap">{displayText}</p>
               </div>
             </div>
           );
@@ -90,7 +92,7 @@ export default function ChatMessages({ messages, isStreaming }) {
         const hasContent = msg.content && msg.content.trim();
 
         return (
-          <div key={i} className="py-1">
+          <div key={i} className="py-0.5">
             {hasContent && (
               <div className="flex gap-2">
                 <span className="text-orange-500 select-none shrink-0 mt-0.5">⏺</span>
@@ -100,16 +102,16 @@ export default function ChatMessages({ messages, isStreaming }) {
               </div>
             )}
             {hasToolCalls && (
-              <div className="space-y-0.5 mt-1.5">
+              <div className="space-y-0 mt-1 ml-6">
                 {msg.tool_calls.map((tc, ti) => (
                   <ToolCall key={ti} toolCall={tc} />
                 ))}
               </div>
             )}
             {isStreaming && isLast && !hasToolCalls && (
-              <div className="flex items-center gap-1.5 mt-2 ml-6">
+              <div className="flex items-center gap-1.5 mt-1 ml-6">
                 <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-                <span className="text-xs text-gray-400">working...</span>
+                <span className="text-[11px] text-gray-400">working</span>
               </div>
             )}
           </div>
