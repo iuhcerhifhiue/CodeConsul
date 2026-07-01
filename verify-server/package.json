@@ -1,0 +1,29 @@
+{
+  "name": "codeconsul-verify-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CodeConsul's verification service — clones a branch, installs deps, runs the repo's real test/typecheck/build command, reports pass/fail. Verification engine vendored from the Consul project.",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "tsx src/server/server.ts",
+    "dev": "tsx watch src/server/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
