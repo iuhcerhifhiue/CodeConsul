@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Brain, Check, FilePen, Terminal, Search, CheckCircle2 } from 'lucide-react';
 
 const steps = [
-  { type: 'phase', icon: Brain, label: 'Planning', color: 'text-blue-400' },
-  { type: 'read', label: 'src/components/Auth.tsx', color: 'text-blue-400' },
-  { type: 'read', label: 'src/lib/api.ts', color: 'text-blue-400' },
-  { type: 'read', label: 'src/middleware.ts', color: 'text-blue-400' },
-  { type: 'phase', icon: Terminal, label: 'Executing', color: 'text-amber-400' },
-  { type: 'write', label: 'src/lib/jwt.ts', color: 'text-green-400', detail: 'created' },
-  { type: 'write', label: 'src/middleware.ts', color: 'text-green-400', detail: 'updated' },
-  { type: 'write', label: 'src/components/Auth.tsx', color: 'text-green-400', detail: 'updated' },
-  { type: 'phase', icon: CheckCircle2, label: 'Complete', color: 'text-green-400' },
-  { type: 'done', label: 'JWT auth with refresh tokens deployed', color: 'text-gray-400' },
+  { type: 'phase', label: 'PLANNING' },
+  { type: 'read', label: 'src/components/Auth.tsx' },
+  { type: 'read', label: 'src/lib/api.ts' },
+  { type: 'read', label: 'src/middleware.ts' },
+  { type: 'phase', label: 'EXECUTING' },
+  { type: 'write', label: 'src/lib/jwt.ts', detail: 'created' },
+  { type: 'write', label: 'src/middleware.ts', detail: 'updated' },
+  { type: 'write', label: 'src/components/Auth.tsx', detail: 'updated' },
+  { type: 'phase', label: 'COMPLETE' },
+  { type: 'done', label: 'JWT auth with refresh tokens deployed' },
 ];
 
 export default function CodeStream() {
@@ -27,30 +26,23 @@ export default function CodeStream() {
   }, [visible]);
 
   return (
-    <div className="relative rounded-2xl border border-white/10 bg-[#0d0d14] overflow-hidden shadow-2xl">
+    <div className="relative border-2 border-editorial bg-[#FFFBEA] rounded-lg overflow-hidden shadow-[6px_6px_0_0_#000]">
       {/* Title bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-        </div>
-        <span className="text-[11px] text-gray-500 font-mono">oikos — auth-feature</span>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b-2 border-editorial">
+        <span className="font-mono text-xs font-bold text-black">oikos — auth-feature</span>
         <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-          <span className="text-[11px] text-gray-500 font-mono">live</span>
+          <span className="w-2 h-2 rounded-full bg-editorial animate-pulse" />
+          <span className="font-mono text-xs text-black font-bold">Live</span>
         </div>
       </div>
 
       {/* Stream */}
-      <div className="p-4 space-y-1 min-h-[340px] font-mono">
+      <div className="p-5 space-y-1 min-h-[340px] font-mono">
         {steps.slice(0, visible).map((step, i) => {
           if (step.type === 'phase') {
-            const Icon = step.icon;
             return (
-              <div key={i} className="animate-stream-in flex items-center gap-1.5 mt-3 first:mt-0">
-                <Icon className={`w-3 h-3 ${step.color}`} />
-                <span className={`text-[11px] font-semibold uppercase tracking-wide ${step.color}`}>
+              <div key={i} className="animate-stream-in mt-4 first:mt-0">
+                <span className="text-xs font-bold tracking-widest text-black bg-editorial px-2 py-0.5 rounded">
                   {step.label}
                 </span>
               </div>
@@ -58,27 +50,26 @@ export default function CodeStream() {
           }
           if (step.type === 'done') {
             return (
-              <div key={i} className="animate-stream-in flex items-start gap-2 mt-3">
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0 mt-0.5" />
-                <span className="text-[12px] text-gray-400 leading-snug">{step.label}</span>
+              <div key={i} className="animate-stream-in flex items-start gap-2 mt-4 pt-3 border-t border-black/10">
+                <span className="text-black shrink-0">→</span>
+                <span className="text-xs text-gray-700 leading-snug">{step.label}</span>
               </div>
             );
           }
           return (
-            <div key={i} className="animate-stream-in flex items-center gap-2 ml-2">
-              <Check className="w-3 h-3 text-gray-600 shrink-0" />
-              {step.type === 'write' && <FilePen className={`w-3 h-3 ${step.color} shrink-0`} />}
-              <span className={`text-[12px] ${step.color} font-medium`}>
+            <div key={i} className="animate-stream-in flex items-center gap-2 ml-1">
+              <span className="text-black">✓</span>
+              <span className={`text-xs font-bold ${step.type === 'write' ? 'text-black' : 'text-gray-500'}`}>
                 {step.type === 'write' ? 'write' : 'read'}
               </span>
-              <span className="text-[12px] text-gray-500 truncate">{step.label}</span>
-              {step.detail && <span className="text-[11px] text-gray-600">{step.detail}</span>}
+              <span className="text-xs text-gray-700 truncate">{step.label}</span>
+              {step.detail && <span className="text-xs text-gray-400">{step.detail}</span>}
             </div>
           );
         })}
         {visible < steps.length && (
-          <div className="flex items-center gap-1.5 ml-2 mt-1">
-            <div className="w-1.5 h-3 bg-indigo-400 animate-blink" />
+          <div className="ml-1 mt-1">
+            <span className="inline-block w-2 h-4 bg-black animate-blink" />
           </div>
         )}
       </div>
