@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { ArrowLeft, Send, Github, Loader2, Crown, Layers } from 'lucide-react';
+import { ArrowLeft, Send, Github, Loader2, Crown, Layers, GitPullRequest } from 'lucide-react';
 import { PLANS } from '@/lib/plans';
 import ChatMessages from '@/components/ChatMessages';
 import AgentPanel from '@/components/AgentPanel';
@@ -20,6 +20,8 @@ export default function Workspace() {
   const [fileTree, setFileTree] = useState('');
   const [keyFiles, setKeyFiles] = useState({});
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [prUrl, setPrUrl] = useState('');
   const unsubRefs = useRef([]);
 
   useEffect(() => {
@@ -107,15 +109,89 @@ export default function Workspace() {
     return parts.length > 0 ? `[PROJECT CONTEXT]\n${parts.join('\n')}\n\n[TASK]\n${task}` : task;
   };
 
+  // Parse the CEO's assignment block. Returns { assignments, error } so the caller
+  // can surface failures to the user instead of silently dispatching nothing.
   const parseAssignments = (content) => {
-    if (!content) return [];
-    const match = content.match(/\[ASSIGNMENTS\]([\s\S]*?)\[\/ASSIGNMENTS\]/);
-    if (!match) return [];
-    try {
-      return JSON.parse(match[1].trim());
-    } catch {
-      return [];
+    if (!content) return { assignments: [], error: 'The CEO returned an empty response.' };
+
+    let jsonText = null;
+    const marked = content.match(/\[ASSIGNMENTS\]([\s\S]*?)\[\/ASSIGNMENTS\]/);
+    if (marked) {
+      jsonText = marked[1].trim();
+    } else {
+      // Fallback: the first JSON array of objects anywhere in the message.
+      const arr = content.match(/\[\s*\{[\s\S]*\}\s*\]/);
+      if (arr) jsonText = arr[0];
     }
+    if (!jsonText) {
+      return { assignments: [], error: 'No [ASSIGNMENTS] block found in the CEO response.' };
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch (e) {
+      return { assignments: [], error: `The CEO produced invalid assignment JSON: ${e.message}` };
+    }
+    if (!Array.isArray(parsed)) {
+      return { assignments: [], error: 'The CEO assignments were not a JSON array.' };
+    }
+
+    const assignments = [];
+    for (const a of parsed) {
+      if (a && typeof a.agent === 'string' && typeof a.task === 'string') {
+        assignments.push({
+          agent: a.agent,
+          task: a.task,
+          depends_on: Array.isArray(a.depends_on) ? a.depends_on.filter((d) => typeof d === 'string') : [],
+        });
+      }
+    }
+    if (assignments.length === 0) {
+      return { assignments: [], error: 'No valid assignments found (each needs an "agent" and a "task").' };
+    }
+    return { assignments, error: null };
+  };
+
+  // Order assignments into execution waves based on depends_on. Assignments whose
+  // prerequisites are all satisfied run together (in parallel); the next wave waits.
+  // Unknown or cyclic dependencies are broken by running the remainder as one wave.
+  const orderIntoWaves = (assignments) => {
+    const names = new Set(assignments.map((a) => a.agent));
+    const done = new Set();
+    const remaining = [...assignments];
+    const waves = [];
+    let guard = 0;
+    while (remaining.length && guard++ < 100) {
+      const ready = remaining.filter((a) => a.depends_on.every((d) => !names.has(d) || done.has(d)));
+      const wave = ready.length ? ready : remaining.slice();
+      waves.push(wave);
+      wave.forEach((a) => {
+        done.add(a.agent);
+        const i = remaining.indexOf(a);
+        if (i >= 0) remaining.splice(i, 1);
+      });
+    }
+    return waves;
+  };
+
+  // Pull the files a specialist actually wrote/edited/deleted from its tool calls,
+  // deduped by path (last operation wins). Used to coordinate later waves.
+  const extractTouched = (messages) => {
+    const map = new Map();
+    for (const m of messages || []) {
+      for (const tc of m.tool_calls || []) {
+        let args = {};
+        try { args = JSON.parse(tc.arguments_string); } catch {}
+        const op = args.operation;
+        const path = args.file_path || args.path;
+        const ok = ['completed', 'success'].includes(tc.status);
+        if (path && ok && ['write', 'edit', 'update', 'delete'].includes(op)) {
+          map.set(path, op);
+        }
+      }
+    }
+    return Array.from(map.entries()).map(([path, op]) => ({ path, op }));
   };
 
   const pollForCeoResponse = (convId, minMsgCount) => {
@@ -144,6 +220,85 @@ export default function Workspace() {
     });
   };
 
+  // Dispatch a single specialist and resolve with the files it touched once it
+  // stops processing (or after a safety timeout, so one stuck agent can't block the run).
+  const runSpecialist = (assignment, branch, priorFiles) => {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (touched) => {
+        if (settled) return;
+        settled = true;
+        resolve(touched);
+      };
+
+      (async () => {
+        try {
+          const conv = await base44.agents.createConversation({
+            agent_name: assignment.agent,
+            metadata: {
+              name: `${assignment.agent} — ${assignment.task.substring(0, 50)}`,
+              description: assignment.task,
+            },
+          });
+
+          setSpecialists((prev) => ({
+            ...prev,
+            [assignment.agent]: { conversationId: conv.id, messages: [], status: 'working', task: assignment.task },
+          }));
+
+          const branchNote = branch
+            ? `\n\n[TASK BRANCH]\nAll file changes MUST target the branch "${branch}". Pass { "branch": "${branch}" } on every githubWrite write/edit/delete so changes land on the review branch, not the default branch.`
+            : '';
+          const coordNote = priorFiles.length
+            ? `\n\n[COORDINATION]\nOther agents in this run already modified these files. READ their current state before touching them and do not overwrite unrelated work:\n${priorFiles.map((f) => `- ${f.path} (${f.op})`).join('\n')}`
+            : '';
+
+          const specialistContext = buildContext(assignment.task) + branchNote + coordNote;
+          await base44.agents.addMessage(conv, { role: 'user', content: specialistContext });
+
+          let lastMessages = [];
+          const unsub = base44.agents.subscribeToConversation(conv.id, (data) => {
+            lastMessages = data.messages || [];
+            setSpecialists((prev) => ({
+              ...prev,
+              [assignment.agent]: {
+                ...prev[assignment.agent],
+                messages: lastMessages,
+                status: data.is_processing ? 'working' : 'done',
+              },
+            }));
+            if (!data.is_processing && lastMessages.some((m) => m.role === 'assistant')) {
+              finish(extractTouched(lastMessages));
+            }
+          });
+          unsubRefs.current.push(unsub);
+
+          // Safety timeout: don't let a stuck specialist stall the whole orchestration.
+          setTimeout(() => {
+            setSpecialists((prev) =>
+              prev[assignment.agent]?.status === 'working'
+                ? { ...prev, [assignment.agent]: { ...prev[assignment.agent], status: 'done' } }
+                : prev,
+            );
+            finish(extractTouched(lastMessages));
+          }, 180000);
+        } catch (err) {
+          console.error(`Specialist ${assignment.agent} failed:`, err);
+          setSpecialists((prev) => ({
+            ...prev,
+            [assignment.agent]: {
+              ...(prev[assignment.agent] || {}),
+              status: 'failed',
+              task: assignment.task,
+              messages: prev[assignment.agent]?.messages || [],
+            },
+          }));
+          finish([]);
+        }
+      })();
+    });
+  };
+
   const handleTask = async (e) => {
     e?.preventDefault();
     if (!input.trim() || isOrchestrating) return;
@@ -151,6 +306,8 @@ export default function Workspace() {
     const task = input.trim();
     setInput('');
     setError('');
+    setNotice('');
+    setPrUrl('');
     setIsOrchestrating(true);
 
     // Clear previous specialist subscriptions
@@ -168,49 +325,73 @@ export default function Workspace() {
 
       const ceoResponse = await pollForCeoResponse(ceoConversationId, msgCountBefore + 1);
 
-      const assignments = parseAssignments(ceoResponse.content);
-      const allowedAgents = (PLANS[userPlan] || PLANS.free).agents;
-      const validAssignments = assignments.filter((a) => allowedAgents.includes(a.agent));
-
-      if (validAssignments.length === 0) {
+      const { assignments, error: parseError } = parseAssignments(ceoResponse.content);
+      if (parseError) {
+        setError(parseError);
         setIsOrchestrating(false);
         return;
       }
 
-      const newSpecialists = {};
-      for (const assignment of validAssignments) {
-        const conv = await base44.agents.createConversation({
-          agent_name: assignment.agent,
-          metadata: {
-            name: `${assignment.agent} — ${task.substring(0, 50)}`,
-            description: assignment.task,
-          },
-        });
+      const allowedAgents = (PLANS[userPlan] || PLANS.free).agents;
+      const validAssignments = assignments.filter((a) => allowedAgents.includes(a.agent));
+      const skipped = assignments.filter((a) => !allowedAgents.includes(a.agent));
 
-        newSpecialists[assignment.agent] = {
-          conversationId: conv.id,
-          messages: [],
-          status: 'working',
-          task: assignment.task,
-        };
-
-        const specialistContext = buildContext(assignment.task);
-        await base44.agents.addMessage(conv, { role: 'user', content: specialistContext });
-
-        const unsub = base44.agents.subscribeToConversation(conv.id, (data) => {
-          setSpecialists((prev) => ({
-            ...prev,
-            [assignment.agent]: {
-              ...prev[assignment.agent],
-              messages: data.messages || [],
-              status: data.is_processing ? 'working' : 'done',
-            },
-          }));
-        });
-        unsubRefs.current.push(unsub);
+      if (validAssignments.length === 0) {
+        setError(
+          `Every assigned agent is above your ${PLANS[userPlan]?.name} plan. Upgrade to deploy: ${assignments.map((a) => a.agent).join(', ')}.`,
+        );
+        setIsOrchestrating(false);
+        return;
+      }
+      if (skipped.length) {
+        setNotice(`Skipped ${skipped.length} agent(s) not in your plan: ${skipped.map((a) => a.agent).join(', ')}.`);
       }
 
-      setSpecialists(newSpecialists);
+      // Create a review branch so specialist changes open a PR instead of
+      // committing straight to the default branch.
+      let branch = '';
+      if (project?.repo_full_name) {
+        try {
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const res = await base44.functions.invoke('githubPullRequest', {
+            operation: 'ensure_branch',
+            repo_full_name: project.repo_full_name,
+            branch: `consul/${stamp}`,
+          });
+          if (res.data?.branch) branch = res.data.branch;
+        } catch (err) {
+          console.error('Failed to create review branch:', err);
+        }
+      }
+
+      // Execute in dependency-ordered waves, accumulating modified files so later
+      // waves know what earlier agents changed.
+      const waves = orderIntoWaves(validAssignments);
+      const modifiedFiles = [];
+      for (const wave of waves) {
+        const results = await Promise.all(wave.map((a) => runSpecialist(a, branch, [...modifiedFiles])));
+        results.flat().forEach((f) => {
+          if (!modifiedFiles.some((m) => m.path === f.path)) modifiedFiles.push(f);
+        });
+      }
+
+      // Open a PR for the user to review once the specialists finish.
+      if (branch && project?.repo_full_name && modifiedFiles.length) {
+        try {
+          const res = await base44.functions.invoke('githubPullRequest', {
+            operation: 'open',
+            repo_full_name: project.repo_full_name,
+            branch,
+            title: `Consul: ${task.substring(0, 60)}`,
+            pr_body: `Automated changes from the Consul multi-agent platform.\n\nTask: ${task}\n\nFiles changed:\n${modifiedFiles.map((f) => `- ${f.path} (${f.op})`).join('\n')}\n\nReview before merging.`,
+          });
+          if (res.data?.url) setPrUrl(res.data.url);
+        } catch (err) {
+          console.error('Failed to open PR:', err);
+          setNotice((n) => `${n ? n + ' ' : ''}Changes landed on branch "${branch}", but opening the PR failed — open it manually.`);
+        }
+      }
+
       setIsOrchestrating(false);
     } catch (err) {
       console.error('Orchestration failed:', err);
@@ -292,6 +473,18 @@ export default function Workspace() {
 
           {/* Input */}
           <div className="border-t border-black px-3 py-2 shrink-0 bg-white">
+            {prUrl && (
+              <div className="mb-2 px-3 py-1.5 rounded border border-black text-xs bg-editorial flex items-center gap-2">
+                <GitPullRequest className="w-3.5 h-3.5 shrink-0" />
+                <span className="font-bold">Pull request opened.</span>
+                <a href={prUrl} target="_blank" rel="noreferrer" className="underline hover:no-underline">Review changes →</a>
+              </div>
+            )}
+            {notice && (
+              <div className="mb-2 px-3 py-1.5 rounded border border-gray-300 text-gray-600 text-xs bg-gray-50">
+                {notice}
+              </div>
+            )}
             {error && (
               <div className="mb-2 px-3 py-1.5 rounded border border-black text-red-600 text-xs bg-[#FFFBEA]">
                 {error}
