@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { ArrowLeft, Send, Github, FileCode } from 'lucide-react';
 import AgentTray from '@/components/AgentTray';
 import TerminalOutput from '@/components/TerminalOutput';
-import FileTree from '@/components/FileTree';
+import ActivityFeed from '@/components/ActivityFeed';
 
 export default function Workspace() {
   const { projectId } = useParams();
@@ -13,7 +13,6 @@ export default function Workspace() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [keyFiles, setKeyFiles] = useState({});
   const [fileTree, setFileTree] = useState('');
@@ -36,20 +35,6 @@ export default function Workspace() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
-
-  useEffect(() => {
-    const allFiles = [];
-    messages.forEach((msg) => {
-      if (msg.role === 'assistant') {
-        const regex = /### → (.+)/g;
-        let match;
-        while ((match = regex.exec(msg.content)) !== null) {
-          allFiles.push(match[1].trim());
-        }
-      }
-    });
-    setFiles([...new Set(allFiles)]);
   }, [messages]);
 
   const loadProject = async () => {
@@ -194,11 +179,11 @@ export default function Workspace() {
         {/* File tree sidebar */}
         <div className="w-52 border-r border-white/5 overflow-y-auto hidden md:flex flex-col">
           <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between">
-            <span className="font-mono text-[10px] text-white/30 uppercase tracking-wider">Generated</span>
-            <span className="font-mono text-[10px] text-white/20">{files.length}</span>
+            <span className="font-mono text-[10px] text-white/30 uppercase tracking-wider">Activity</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/40" />
           </div>
           <div className="flex-1 overflow-y-auto">
-            <FileTree files={files} />
+            <ActivityFeed messages={messages} />
           </div>
           {fileTree && (
             <div className="border-t border-white/5 p-2">
