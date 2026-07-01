@@ -1,10 +1,21 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+const CONNECTOR_ID = '6a242ab8748831bf367aed86';
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Get the user's OAuth token from the GitHub connector
+    let accessToken;
+    try {
+      const connection = await base44.asServiceRole.connectors.getCurrentAppUserConnection(CONNECTOR_ID);
+      accessToken = connection.accessToken;
+    } catch {
+      return Response.json({ error: 'GITHUB_NOT_CONNECTED', message: 'Connect your GitHub account first' }, { status: 403 });
+    }
 
     const body = await req.json();
     const { operation, repo_full_name, file_path, content, commit_message, branch } = body;
@@ -13,11 +24,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'repo_full_name and file_path are required' }, { status: 400 });
     }
 
-    const token = Deno.env.get('GITHUB_TOKEN')?.trim();
-    if (!token) return Response.json({ error: 'GITHUB_TOKEN not configured' }, { status: 500 });
-
     const headers = {
-      'Authorization': `token ${token}`,
+      'Authorization': `token ${accessToken}`,
       'Accept': 'application/vnd.github.v3+json',
       'User-Agent': 'Consul-Oikos',
     };
@@ -26,7 +34,6 @@ Deno.serve(async (req) => {
     const refParam = branch ? `?ref=${branch}` : '';
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file_path}${refParam}`;
 
-    // Helper: decode base64 to UTF-8 string
     const decodeBase64 = (b64) => {
       const binary = atob(b64.replace(/\n/g, ''));
       const bytes = new Uint8Array(binary.length);
@@ -34,7 +41,6 @@ Deno.serve(async (req) => {
       return new TextDecoder().decode(bytes);
     };
 
-    // Helper: encode UTF-8 string to base64
     const encodeBase64 = (str) => {
       const bytes = new TextEncoder().encode(str);
       let binary = '';
@@ -42,30 +48,24 @@ Deno.serve(async (req) => {
       return btoa(binary);
     };
 
+    const safeError = async (res, fallback) => {
+      const text = await res.text();
+      let msg = fallback;
+      try { msg = JSON.parse(text).message || msg; } catch { if (text) msg = text.substring(0, 200); }
+      return Response.json({ error: msg }, { status: res.status });
+    };
+
     if (operation === 'read') {
       const res = await fetch(apiUrl, { headers });
-      if (!res.ok) {
-        const text = await res.text();
-        let msg = 'File not found';
-        try { msg = JSON.parse(text).message || msg; } catch { if (text) msg = text.substring(0, 200); }
-        return Response.json({ error: msg }, { status: res.status });
-      }
+      if (!res.ok) return safeError(res, 'File not found');
       const data = await res.json();
       const decoded = data.encoding === 'base64' ? decodeBase64(data.content) : '';
-      return Response.json({
-        path: file_path,
-        content: decoded,
-        sha: data.sha,
-        size: data.size,
-      });
+      return Response.json({ path: file_path, content: decoded, sha: data.sha, size: data.size });
     }
 
     if (operation === 'write' || operation === 'update') {
-      if (content === undefined) {
-        return Response.json({ error: 'content is required for write operation' }, { status: 400 });
-      }
+      if (content === undefined) return Response.json({ error: 'content is required' }, { status: 400 });
 
-      // Check if file exists to get sha (needed for updates)
       let sha;
       const checkRes = await fetch(apiUrl, { headers });
       if (checkRes.ok) {
@@ -74,7 +74,6 @@ Deno.serve(async (req) => {
       }
 
       const isUpdate = !!sha;
-      const encodedContent = encodeBase64(content);
       const payload = {
         message: commit_message || `Oikos: ${isUpdate ? 'update' : 'create'} ${file_path}`,
         content: encodeBase64(content),
@@ -88,13 +87,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify(payload),
       });
 
-      if (!writeRes.ok) {
-        const text = await writeRes.text();
-        let msg = 'Failed to write file';
-        try { msg = JSON.parse(text).message || msg; } catch { if (text) msg = text.substring(0, 200); }
-        return Response.json({ error: msg }, { status: writeRes.status });
-      }
-
+      if (!writeRes.ok) return safeError(writeRes, 'Failed to write file');
       const writeData = await writeRes.json();
       return Response.json({
         path: file_path,
@@ -107,9 +100,7 @@ Deno.serve(async (req) => {
 
     if (operation === 'delete') {
       const checkRes = await fetch(apiUrl, { headers });
-      if (!checkRes.ok) {
-        return Response.json({ error: 'File not found' }, { status: 404 });
-      }
+      if (!checkRes.ok) return Response.json({ error: 'File not found' }, { status: 404 });
       const checkData = await checkRes.json();
       const sha = checkData.sha;
 
@@ -123,13 +114,7 @@ Deno.serve(async (req) => {
         }),
       });
 
-      if (!delRes.ok) {
-        const text = await delRes.text();
-        let msg = 'Failed to delete file';
-        try { msg = JSON.parse(text).message || msg; } catch { if (text) msg = text.substring(0, 200); }
-        return Response.json({ error: msg }, { status: delRes.status });
-      }
-
+      if (!delRes.ok) return safeError(delRes, 'Failed to delete file');
       const delData = await delRes.json();
       return Response.json({
         path: file_path,

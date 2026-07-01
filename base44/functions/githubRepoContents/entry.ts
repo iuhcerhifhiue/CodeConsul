@@ -1,41 +1,44 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+const CONNECTOR_ID = '6a242ab8748831bf367aed86';
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Get the user's OAuth token — works for both public and private repos
+    let accessToken;
+    let headers = { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Consul-Oikos' };
+    try {
+      const connection = await base44.asServiceRole.connectors.getCurrentAppUserConnection(CONNECTOR_ID);
+      accessToken = connection.accessToken;
+      headers['Authorization'] = `token ${accessToken}`;
+    } catch {
+      // No connection — will only be able to access public repos unauthenticated
     }
 
     const body = await req.json();
     const { repo_full_name } = body;
-    if (!repo_full_name) {
-      return Response.json({ error: 'repo_full_name is required' }, { status: 400 });
-    }
+    if (!repo_full_name) return Response.json({ error: 'repo_full_name is required' }, { status: 400 });
 
     const [owner, repo] = repo_full_name.split('/');
 
-    // Get repo info for default branch (public API, no auth needed)
-    const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: { 'Accept': 'application/vnd.github.v3+json' },
-    });
+    const repoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     if (!repoResponse.ok) {
-      return Response.json({ error: 'Repository not found. Check the URL and make sure it is public.' }, { status: repoResponse.status });
+      const text = await repoResponse.text();
+      let msg = 'Repository not found. Check the URL and make sure you have access.';
+      try { msg = JSON.parse(text).message || msg; } catch {}
+      return Response.json({ error: msg }, { status: repoResponse.status });
     }
     const repoInfo = await repoResponse.json();
     const defaultBranch = repoInfo.default_branch;
 
-    // Get recursive file tree
-    const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, {
-      headers: { 'Accept': 'application/vnd.github.v3+json' },
-    });
-    if (!treeResponse.ok) {
-      return Response.json({ error: 'Failed to fetch file tree' }, { status: treeResponse.status });
-    }
+    const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, { headers });
+    if (!treeResponse.ok) return Response.json({ error: 'Failed to fetch file tree' }, { status: treeResponse.status });
     const treeData = await treeResponse.json();
 
-    // Build file tree string, excluding noise directories
     const ignorePatterns = ['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', '.cache', 'vendor', 'target', '.venv', 'coverage'];
     const filePaths = treeData.tree
       .filter((item) => item.type === 'blob')
@@ -44,7 +47,6 @@ Deno.serve(async (req) => {
 
     const fileTree = filePaths.join('\n');
 
-    // Fetch key config files for context
     const keyFileNames = [
       'package.json', 'tsconfig.json', 'Cargo.toml', 'go.mod', 'requirements.txt',
       'pyproject.toml', 'pom.xml', 'build.gradle', 'Gemfile', 'composer.json',
@@ -60,22 +62,20 @@ Deno.serve(async (req) => {
     const keyFiles = {};
     for (const path of filesToFetch) {
       try {
-        const contentResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${defaultBranch}`, {
-          headers: { 'Accept': 'application/vnd.github.v3+json' },
-        });
+        const contentResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${defaultBranch}`, { headers });
         if (contentResponse.ok) {
           const contentData = await contentResponse.json();
           if (contentData.encoding === 'base64') {
-            const content = atob(contentData.content.replace(/\n/g, ''));
-            keyFiles[path] = content.length > 3000 ? content.substring(0, 3000) + '\n... (truncated)' : content;
+            const binary = atob(contentData.content.replace(/\n/g, ''));
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const decoded = new TextDecoder().decode(bytes);
+            keyFiles[path] = decoded.length > 3000 ? decoded.substring(0, 3000) + '\n... (truncated)' : decoded;
           }
         }
-      } catch (e) {
-        // Skip failed files
-      }
+      } catch {}
     }
 
-    // Detect stack from package.json
     let stack = 'Unknown';
     if (keyFiles['package.json']) {
       try {
@@ -96,17 +96,11 @@ Deno.serve(async (req) => {
         if (deps['socket.io']) parts.push('Socket.io');
         stack = parts.length > 0 ? parts.join(', ') : 'Node.js';
       } catch {}
-    } else if (keyFiles['go.mod']) {
-      stack = 'Go';
-    } else if (keyFiles['Cargo.toml']) {
-      stack = 'Rust';
-    } else if (keyFiles['requirements.txt'] || keyFiles['pyproject.toml']) {
-      stack = 'Python';
-    } else if (keyFiles['Gemfile']) {
-      stack = 'Ruby';
-    } else if (keyFiles['pom.xml'] || keyFiles['build.gradle']) {
-      stack = 'Java';
-    }
+    } else if (keyFiles['go.mod']) stack = 'Go';
+    else if (keyFiles['Cargo.toml']) stack = 'Rust';
+    else if (keyFiles['requirements.txt'] || keyFiles['pyproject.toml']) stack = 'Python';
+    else if (keyFiles['Gemfile']) stack = 'Ruby';
+    else if (keyFiles['pom.xml'] || keyFiles['build.gradle']) stack = 'Java';
 
     return Response.json({
       file_tree: fileTree.substring(0, 10000),
