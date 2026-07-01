@@ -81,8 +81,18 @@ export default function ChatMessages({ messages, isStreaming }) {
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-6 py-20">
-        <div className="w-11 h-11 rounded-xl bg-gray-900 flex items-center justify-center mb-4">
-          <span className="text-white text-base font-bold">α</span>
+        <div className="relative w-12 h-12 mb-4 flex items-center justify-center">
+          <svg viewBox="0 0 48 48" className="w-12 h-12">
+            <defs>
+              <linearGradient id="oikosGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#6366f1" />
+                <stop offset="100%" stopColor="#8b5cf6" />
+              </linearGradient>
+            </defs>
+            <path d="M24 4 C13 4 6 12 6 24 C6 36 13 44 24 44 C35 44 42 36 42 24 C42 12 35 4 24 4 Z M24 8 C32 8 38 14 38 24 C38 34 32 40 24 40 C16 40 10 34 10 24 C10 14 16 8 24 8 Z" fill="url(#oikosGrad)" />
+            <path d="M24 14 Q30 24 24 34 Q18 24 24 14 Z" fill="url(#oikosGrad)" opacity="0.8" />
+            <circle cx="24" cy="24" r="2.5" fill="#8b5cf6" />
+          </svg>
         </div>
         <h2 className="font-heading text-base font-semibold text-gray-900">Oikos is ready</h2>
         <p className="text-[13px] text-gray-500 mt-1 max-w-sm leading-relaxed">Describe what you want to build and Oikos will read, write, and commit code directly to your repo.</p>
