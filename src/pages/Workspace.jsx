@@ -409,15 +409,18 @@ export default function Workspace() {
 
       // Verify on the branch: clone it, run the repo's real test/typecheck/build
       // command, and report pass/fail — this is the step that turns "the agents
-      // said they're done" into "the code actually works." On failure, dispatch
-      // one bounded repair pass to the agent(s) whose files are implicated, then
-      // re-verify once and report the final state.
+      // said they're done" into "the code actually works." On failure, loop a
+      // bounded repair: re-dispatch to the agent(s) whose files are implicated,
+      // re-verify, and repeat until green, out of attempts, or a pass makes no
+      // changes (the same "no progress → stop" floor Consul's repair loop uses).
+      const MAX_REPAIRS = 2;
       let verificationResult = null;
+      let repairPasses = 0;
       if (branch && project?.repo_full_name && modifiedFiles.length) {
         setIsVerifying(true);
         verificationResult = await verifyOnBranch(branch);
 
-        if (verificationResult?.ran && !verificationResult?.passed) {
+        while (verificationResult?.ran && !verificationResult?.passed && repairPasses < MAX_REPAIRS) {
           const failingPaths = new Set((verificationResult.failures || []).map((f) => f.file).filter(Boolean));
           const allAgents = [...new Set(modifiedFiles.map((f) => f.agent).filter(Boolean))];
           const implicatedAgents = failingPaths.size
@@ -426,28 +429,37 @@ export default function Workspace() {
           const repairAgents = (implicatedAgents.length ? implicatedAgents : allAgents).filter((a) =>
             allowedAgents.includes(a),
           );
+          if (!repairAgents.length) break;
 
-          if (repairAgents.length) {
-            setNotice((n) => `${n ? n + ' ' : ''}Verification failed — dispatching a repair pass to ${repairAgents.join(', ')}.`);
-            const failureText =
-              (verificationResult.failures || [])
-                .slice(0, 10)
-                .map((f) => `- ${f.file ? f.file + ': ' : ''}${f.label} — ${f.detail}`)
-                .join('\n') || verificationResult.summary;
+          repairPasses++;
+          setNotice((n) => `${n ? n + ' ' : ''}Verification failed — repair pass ${repairPasses}/${MAX_REPAIRS} to ${repairAgents.join(', ')}.`);
+          const failureText =
+            (verificationResult.failures || [])
+              .slice(0, 10)
+              .map((f) => `- ${f.file ? f.file + ': ' : ''}${f.label} — ${f.detail}`)
+              .join('\n') || verificationResult.summary;
 
-            const repairAssignments = repairAgents.map((agent) => ({
-              agent,
-              task: `Fix this verification failure on branch "${branch}". Re-read the current file state first — it may differ from what you last wrote.\n\n${failureText}`,
-              depends_on: [],
-            }));
-            const repairResults = await Promise.all(
-              repairAssignments.map((a) => runSpecialist(a, branch, [...modifiedFiles])),
-            );
-            repairAssignments.forEach((a, i) => recordTouched(a.agent, repairResults[i] || []));
+          const repairAssignments = repairAgents.map((agent) => ({
+            agent,
+            task: `Fix this verification failure on branch "${branch}" (repair attempt ${repairPasses}). Re-read the current file state first — it may differ from what you last wrote.\n\n${failureText}`,
+            depends_on: [],
+          }));
+          const repairResults = await Promise.all(
+            repairAssignments.map((a) => runSpecialist(a, branch, [...modifiedFiles])),
+          );
+          repairAssignments.forEach((a, i) => recordTouched(a.agent, repairResults[i] || []));
 
-            const reverified = await verifyOnBranch(branch);
-            verificationResult = reverified ? { ...reverified, repaired: true } : verificationResult;
+          // No progress → stop, exactly like Consul's keyless floor: re-verifying
+          // an unchanged tree would just return the same failure.
+          if (!repairResults.some((r) => (r || []).length > 0)) {
+            setNotice((n) => `${n ? n + ' ' : ''}Repair pass ${repairPasses} produced no changes — stopping.`);
+            break;
           }
+
+          const reverified = await verifyOnBranch(branch);
+          verificationResult = reverified
+            ? { ...reverified, repaired: true, repairPasses }
+            : verificationResult;
         }
         setIsVerifying(false);
         setVerification(verificationResult);
@@ -460,7 +472,7 @@ export default function Workspace() {
           const verifyLine = !verificationResult
             ? ''
             : verificationResult.ran
-              ? `\nVerification: ${verificationResult.passed ? 'passed' : 'FAILED'}${verificationResult.repaired ? ' (after 1 repair pass)' : ''} — ${verificationResult.summary}`
+              ? `\nVerification: ${verificationResult.passed ? 'passed' : 'FAILED'}${verificationResult.repaired ? ` (after ${verificationResult.repairPasses} repair pass${verificationResult.repairPasses > 1 ? 'es' : ''})` : ''} — ${verificationResult.summary}`
               : `\nVerification: skipped — ${verificationResult.summary || 'no verify service configured'}`;
           const res = await base44.functions.invoke('githubPullRequest', {
             operation: 'open',
@@ -569,7 +581,7 @@ export default function Workspace() {
                   {verification.passed ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
                   <span className="font-bold">
                     {verification.passed ? 'Verified — real tests passed' : 'Verification failed'}
-                    {verification.repaired ? ' (after 1 repair pass)' : ''}
+                    {verification.repaired ? ` (after ${verification.repairPasses} repair pass${verification.repairPasses > 1 ? 'es' : ''})` : ''}
                   </span>
                 </div>
                 {verification.summary && <p className="mt-1 text-gray-600">{verification.summary}</p>}
