@@ -126,6 +126,31 @@ export default function Workspace() {
     try {
       const conv = await base44.agents.getConversation(conversationId);
       await base44.agents.addMessage(conv, { role: 'user', content: contextMessage });
+
+      // Poll conversation until Oikos responds, then re-enable input
+      const userMsgCount = messages.length + 1;
+      const poll = async () => {
+        let attempts = 0;
+        const interval = setInterval(async () => {
+          attempts++;
+          try {
+            const updated = await base44.agents.getConversation(conversationId);
+            const msgs = updated.messages || [];
+            if (msgs.length > userMsgCount) {
+              setMessages(msgs);
+              setIsStreaming(false);
+              clearInterval(interval);
+            } else if (attempts > 150) {
+              // 5 minute timeout
+              setIsStreaming(false);
+              clearInterval(interval);
+            }
+          } catch {
+            // Keep polling
+          }
+        }, 2000);
+      };
+      poll();
     } catch (err) {
       console.error('Failed to send message:', err);
       setIsStreaming(false);
