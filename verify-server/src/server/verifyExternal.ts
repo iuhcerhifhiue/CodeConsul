@@ -37,7 +37,7 @@ export type VerifyExternalResult =
  */
 export async function verifyExternalRepo(req: VerifyExternalRequest): Promise<VerifyExternalResult> {
   try {
-    const clone = await cloneRepo(req.cloneUrl, req.cloneDir, { branch: req.branch, depth: 1 });
+    const clone = await cloneRepo(req.cloneUrl, req.cloneDir, { branch: req.branch, depth: 1, timeoutMs: 120_000 });
     if (!clone.ok) {
       const detail = clone.stderr || clone.stdout || "unknown error";
       return { ok: false, error: `clone failed: ${redactSecrets(detail, req.redactSecrets)}` };

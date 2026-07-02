@@ -10,9 +10,13 @@ export interface GitResult {
 }
 
 /** Shared by every git invocation in this module — normalizes a thrown exec error into a {@link GitResult} instead of letting callers deal with raw exceptions. */
-async function execGit(args: string[], cwd?: string): Promise<GitResult> {
+async function execGit(args: string[], cwd?: string, timeoutMs?: number): Promise<GitResult> {
   try {
-    const { stdout, stderr } = await pexec("git", args, { cwd, windowsHide: true });
+    const { stdout, stderr } = await pexec("git", args, {
+      cwd,
+      windowsHide: true,
+      ...(timeoutMs ? { timeout: timeoutMs, killSignal: "SIGKILL" as const } : {}),
+    });
     return { ok: true, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (err) {
     const e = err as { stdout?: Buffer | string; stderr?: Buffer | string };
@@ -91,6 +95,8 @@ export interface CloneOptions {
   branch?: string;
   /** Shallow-clone to this depth (e.g. 1). Omit for a full clone. */
   depth?: number;
+  /** Hard wall-clock cap in ms; the git process is killed past this. Guards against a hung clone of an arbitrary repo. */
+  timeoutMs?: number;
 }
 
 /**
@@ -105,7 +111,7 @@ export async function cloneRepo(url: string, dir: string, opts: CloneOptions = {
   if (opts.depth !== undefined) args.push("--depth", String(opts.depth));
   if (opts.branch) args.push("--branch", opts.branch);
   args.push(url, dir);
-  return execGit(args);
+  return execGit(args, undefined, opts.timeoutMs);
 }
 
 /** Extract `{owner, repo}` from an https or ssh GitHub remote URL, or null. */
