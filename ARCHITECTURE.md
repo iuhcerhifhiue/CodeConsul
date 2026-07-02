@@ -1,140 +1,90 @@
-# ARCHITECTURE.md: Consul — Autonomous Multi-Agent Coding Platform
+# CodeConsul Architecture Overview
 
-## 1. Introduction
+This document outlines the architecture of the CodeConsul application, detailing its main components, technologies used, and their interactions.
 
-Consul is an autonomous multi-agent AI coding platform designed to decompose user tasks into sub-tasks and delegate them to specialized engineering agents. These agents interact directly with GitHub repositories to read, write, and commit code. This document outlines the system's architecture, key components, technology choices, and data flow.
+## 1. Overall Architecture
 
-## 2. Overall Architecture
+CodeConsul follows a client-server architecture, primarily composed of a web-based frontend application and a dedicated backend verification service. The frontend interacts with various backend services (likely including the Base44 platform and the verification service) to provide its functionality.
 
-The Consul platform follows a client-server architecture with a clear separation between the frontend user interface and the backend services. The core of the system is the Oikos (CEO) orchestrator, which manages the task delegation to various specialist agents. All agent interactions with code repositories are facilitated through the GitHub API.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    FRONTEND (React + Vite)                │
-│                                                          │
-│  Landing → Dashboard → Workspace                         │
-│                          │                               │
-│                 ┌────────┴────────┐                      │
-│                 │  Oikos (CEO)    │  Parses task,        │
-│                 │  Chat Panel     │  outputs assignments │
-│                 └────────┬────────┘                      │
-│                          │                               │
-│              ┌───────────┼───────────┐                   │
-│              ▼           ▼           ▼                   │
-│         ┌────────┐ ┌────────┐ ┌────────┐                │
-│         │ UI     │ │Backend │ │Terminal│  ...up to 22   │
-│         │Builder │ │Engineer│ │ Ops    │  specialist    │
-│         └────┬───┘ └────┬───┘ └────┬───┘  agents        │
-│              │          │          │                     │
-└──────────────┼──────────┼──────────┼─────────────────────┘
-               │          │          │
-┌──────────────┼──────────┼──────────┼─────────────────────┐
-│              ▼          ▼          ▼     BACKEND (Deno)   │
-│         ┌──────────────────────────────┐                 │
-│         │     githubWrite (CRUD)       │  Read, write,   │
-│         │     githubRepoContents       │  delete files   │
-│         │     githubRepos (list)       │  via GitHub API │
-│         └──────────────┬───────────────┘                 │
-│                        │                                 │
-│                        ▼                                 │
-│              ┌──────────────────┐                        │
-│              │  GitHub API v3   │  Commits land in       │
-│              │  (REST)          │  your repo directly    │
-│              └──────────────────┘                        │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    User -->|Accesses| Frontend(Web Application)
+    Frontend -->|API Calls| Base44_Platform[Base44 Platform / Other APIs]
+    Frontend -->|Requests Verification| Verification_Service(Verification Service)
+    Verification_Service -->|Clones/Executes Code| GitHub[GitHub/Code Repositories]
+    Verification_Service -->|Reports Status| Frontend
 ```
 
-## 3. Key Components
+## 2. Main Components
 
-### 3.1 Frontend (`consul/src/`)
+### 2.1. Frontend (Web Application)
 
-Developed with React and Vite, the frontend provides the user interface for interacting with the Consul platform.
+The client-side application provides the user interface and interacts with various backend services.
 
--   **Pages**:
-    -   `Landing.jsx`: Marketing page for the platform.
-    -   `Dashboard.jsx`: Displays the list of connected repositories and allows connecting new ones.
-    -   `Workspace.jsx`: The primary interface for users to submit tasks and observe agent activity. It features the CEO chat and specialist agent panels.
-    -   `Plans.jsx`: Manages plan selection (Free/Starter/Pro/Builder).
-    -   `Login.jsx` & `Register.jsx`: Handles user authentication (email/password and Google OAuth).
--   **Components**: Reusable UI elements such as `ChatMessages`, `AgentPanel`, `FileTree`, `CodeBlock`, etc., facilitating a rich user experience.
--   **Libraries (`lib/`)**: Includes `plans.js` for agent and plan metadata, `AuthContext.jsx` for authentication context, and `query-client.js` for React Query setup.
--   **API Client (`api/`)**: `base44Client.js` an initialized Base44 SDK client for interacting with backend services.
+*   **Technology Stack:**
+    *   **Framework:** React
+    *   **Build Tool:** Vite
+    *   **UI Component Library:** Radix UI (extensive use for accessible and customizable components)
+    *   **Styling Framework:** Tailwind CSS (for utility-first styling)
+    *   **State Management & Data Fetching:** React Query (for server state management and data synchronization)
+    *   **Form Management:** React Hook Form, integrated with Zod for schema validation.
+    *   **Routing:** React Router DOM
+    *   **Integration:** `@base44/sdk` and `@base44/vite-plugin` for interacting with the Base44 platform.
+    *   **Payments:** Stripe (via `@stripe/react-stripe-js`)
+    *   **Animations:** Framer Motion
+    *   **Other Notable Libraries:** `lucide-react` (icons), `lodash` (utilities), `date-fns` (date manipulation), `recharts` (charting), `html2canvas` (screenshots), `jspdf` (PDF generation).
 
-### 3.2 Backend (`consul/base44/`)
+*   **Responsibilities:**
+    *   User authentication and authorization (via Base44).
+    *   Displaying project information, code, and verification results.
+    *   User interaction and data input.
+    *   Integration with external services like Stripe for payments.
 
-The backend is built using Deno serverless functions, providing the computational and integration layer for the AI agents and GitHub interactions.
+### 2.2. Verification Service (Backend)
 
--   **AI Agent Configurations (`agents/`)**:
-    -   `oikos.jsonc`: Configuration for the CEO orchestrator.
-    -   `ui_builder.jsonc`, `backend_engineer.jsonc`, `terminal_ops.jsonc`, `architect.jsonc`, etc.: Configurations for the 22 specialist agents, each with a defined domain and plan level.
--   **Serverless Functions (`functions/`)**:
-    -   `githubWrite/entry.ts`: Provides CRUD operations (read, write, delete) for files within GitHub repositories. This is the primary mechanism for agents to modify code.
-    -   `githubRepoContents/entry.ts`: Indexes repository content, extracts file trees, identifies key configuration files, and detects the technology stack.
-    -   `githubRepos/entry.ts`: Lists the user's accessible GitHub repositories.
--   **Entities (`entities/`)**:
-    -   `Project.jsonc`: Stores metadata about connected repositories, including file tree and detected stack.
-    -   `Session.jsonc`: Maps CEO conversations to specific project contexts.
+A dedicated Node.js service responsible for executing code verification tasks.
 
-## 4. Technology Stack
+*   **Technology Stack:**
+    *   **Runtime:** Node.js (executed with `tsx` for TypeScript support)
+    *   **Web Framework:** Express.js
+    *   **Schema Validation:** Zod
+    *   **Testing:** Vitest
 
--   **Frontend**: React, Vite, Tailwind CSS, React Query
--   **Backend**: Deno (serverless functions), TypeScript
--   **Version Control**: Git, GitHub API v3 (REST)
--   **Authentication**: Email/Password, Google OAuth
--   **Styling**: Tailwind CSS, PostCSS
--   **Tooling**: ESLint, Prettier (implied by project structure), Vite
+*   **Responsibilities:**
+    *   Receiving verification requests from the frontend or other services.
+    *   Cloning specified branches/repositories (likely from GitHub).
+    *   Installing project dependencies.
+    *   Executing project-defined commands (e.g., `test`, `typecheck`, `build`).
+    *   Analyzing command output and determining verification success or failure.
+    *   Reporting verification status and logs back to the requesting service (e.g., frontend).
 
-## 5. Data Flow and Workflow
+## 3. Data Flow and Interactions
 
-The platform operates through the following workflow:
+1.  **User Interaction:** A user interacts with the **Frontend** to manage projects, view code, or initiate a verification process.
+2.  **API Calls to Base44:** The **Frontend** communicates with the **Base44 Platform** for core application logic, data storage, and potentially authentication.
+3.  **Verification Request:** When a user requests code verification, the **Frontend** sends a request to the **Verification Service**. This request likely includes repository details (e.g., URL, branch) and commands to execute.
+4.  **Code Execution:** The **Verification Service** clones the specified repository (e.g., from **GitHub**), installs dependencies, and runs the requested build/test/typecheck commands within an isolated environment.
+5.  **Status Reporting:** After execution, the **Verification Service** processes the results and reports the pass/fail status and relevant output back to the **Frontend**.
+6.  **UI Update:** The **Frontend** updates the user interface to display the verification results.
 
-1.  **Repository Connection**: A user connects a GitHub repository via the Dashboard. The `githubRepoContents` function is invoked to index the repository's file tree, identify key configuration files, and determine the technology stack. This information is stored in the `Project` entity.
+## 4. Project Structure
 
-2.  **Task Submission**: The user describes a desired task in the Workspace chat panel. This task is sent to the Oikos (CEO) orchestrator.
+The repository is structured as a monorepo or at least contains distinct service directories:
 
-3.  **CEO Orchestration (Oikos)**: The Oikos agent, with full project context (repo name, stack, file tree, key files), analyzes the task. It then decomposes the task into sub-tasks and generates structured `[ASSIGNMENTS]` JSON. Each assignment specifies the specialist agent responsible and the sub-task description.
+*   `/`: Root directory containing the main frontend application.
+    *   `package.json`: Main frontend dependencies and scripts.
+    *   `vite.config.ts`: Vite configuration for the frontend build.
+    *   *(Further files will be analyzed as needed)*
+*   `verify-server/`: Directory containing the backend verification service.
+    *   `package.json`: Dependencies and scripts specific to the verification service.
+    *   `src/server/server.ts`: Entry point for the Express.js server.
+    *   *(Further files will be analyzed as needed)*
 
-4.  **Specialist Execution**:
-    -   The Workspace filters assignments and initiates a conversation for each specialist agent.
-    -   Each specialist agent follows an autonomous workflow:
-        1.  **READ**: Fetches relevant files from the repository using `githubWrite(operation: "read")`.
-        2.  **WRITE**: Writes or modifies code and other files using `githubWrite(operation: "write")`. This results in direct commits to the user's GitHub repository.
-        3.  **VERIFY**: Reads back a file to confirm the commit was successful.
-        4.  **DONE**: Provides a short summary of its completed work.
-    -   Real-time updates on agent activities (file reads, writes, commits, status) are streamed back to the user in the Workspace.
+## 5. Key Decisions and Rationale
 
-## 6. Project Structure
+*   **Separation of Concerns:** The application is divided into a distinct frontend and a verification backend service. This promotes modularity, allows independent scaling, and enables different technology choices for each component based on its specific needs.
+*   **Modern Frontend Stack:** React with Vite, Radix UI, and Tailwind CSS provides a highly performant, maintainable, and visually appealing user interface.
+*   **TypeScript for Type Safety:** Both frontend and backend leverage TypeScript to enhance code quality, reduce bugs, and improve developer experience.
+*   **Base44 Integration:** Core application data and functionality are likely handled through the Base44 platform, simplifying backend infrastructure for the main application.
+*   **Dedicated Verification Microservice:** Offloading code verification to a separate service prevents the main application from being burdened by computationally intensive and potentially risky operations like cloning and executing arbitrary code.
 
-The repository `consul/` is organized as follows:
-
-```
-consul/
-├── src/                          # Frontend (React + Tailwind)
-│   ├── pages/                    # React Pages
-│   ├── components/               # Reusable React Components
-│   ├── lib/                      # Frontend utility libraries
-│   ├── api/                      # Frontend API client
-│   ├── App.jsx                   # Main React Router
-│   ├── index.css                 # Global CSS
-│   └── main.jsx                  # Frontend Entry point
-│
-├── base44/
-│   ├── agents/                   # AI Agent Configurations (JSONC)
-│   ├── functions/                # Backend Serverless Functions (Deno/TypeScript)
-│   │   ├── githubWrite/
-│   │   ├── githubRepoContents/
-│   │   └── githubRepos/
-│   │
-│   └── entities/                 # Data Models (JSONC)
-│       ├── Project.jsonc
-│       └── Session.jsonc
-│
-├── index.html                    # App shell
-├── package.json                  # Node.js dependencies
-├── vite.config.js                # Vite configuration
-├── tailwind.config.js            # Tailwind CSS configuration
-├── postcss.config.js             # PostCSS configuration
-├── jsconfig.json                 # JavaScript configuration
-├── eslint.config.js              # ESLint configuration
-└── README.md                     # Project README
-```
