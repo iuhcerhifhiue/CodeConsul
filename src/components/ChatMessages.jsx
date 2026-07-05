@@ -84,8 +84,8 @@ export default function ChatMessages({ messages, isStreaming }) {
             <circle cx="24" cy="24" r="2" fill="#5046E5" />
           </svg>
         </div>
-        <h2 className="font-heading text-base font-semibold text-black">Oikos is ready</h2>
-        <p className="text-[13px] text-black/40 mt-1 max-w-sm leading-relaxed">Describe what you want to build and Oikos will read, write, and commit code directly to your repo.</p>
+        <h2 className="font-heading text-base font-semibold text-black">Consul is ready</h2>
+        <p className="text-[13px] text-black/40 mt-1 max-w-sm leading-relaxed">Describe what you want to build and Consul will read, write, and commit code directly to your repo.</p>
         <div className="mt-6 flex flex-col gap-1 max-w-lg w-full">
           <p className="text-[11px] font-medium text-black/30 uppercase tracking-wider mb-1 text-left">Try asking</p>
           {[

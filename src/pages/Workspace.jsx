@@ -1,31 +1,46 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { ArrowLeft, Send, Github, Loader2, Crown, Layers, GitPullRequest, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  ArrowLeft, Send, Github, Loader2, GitPullRequest,
+  Clock, FileSearch, FilePen, AlertCircle,
+} from 'lucide-react';
 import { PLANS } from '@/lib/plans';
 import ChatMessages from '@/components/ChatMessages';
-import AgentPanel from '@/components/AgentPanel';
-import AgentRoster from '@/components/AgentRoster';
 import Logo from '@/components/Logo';
+
+function computeStats(messages) {
+  let reads = 0, writes = 0;
+  for (const msg of messages) {
+    if (msg.role !== 'assistant') continue;
+    for (const tc of msg.tool_calls || []) {
+      if (!['completed', 'success'].includes(tc.status)) continue;
+      let args = {};
+      try { args = JSON.parse(tc.arguments_string); } catch {}
+      const op = args.operation || 'read';
+      if (op === 'read') reads++;
+      else if (['write', 'edit', 'update'].includes(op)) writes++;
+    }
+  }
+  return { reads, writes };
+}
 
 export default function Workspace() {
   const { projectId } = useParams();
   const [project, setProject] = useState(null);
   const [userPlan, setUserPlan] = useState('free');
-  const [ceoConversationId, setCeoConversationId] = useState(null);
-  const [ceoMessages, setCeoMessages] = useState([]);
-  const [specialists, setSpecialists] = useState({});
+  const [conversationId, setConversationId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [isOrchestrating, setIsOrchestrating] = useState(false);
+  const [isWorking, setIsWorking] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [fileTree, setFileTree] = useState('');
-  const [keyFiles, setKeyFiles] = useState({});
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [prUrl, setPrUrl] = useState('');
-  const [verification, setVerification] = useState(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const unsubRefs = useRef([]);
+  const [error, setError] = useState('');
+  const [startTime, setStartTime] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  const branchRef = useRef('');
+  const taskRef = useRef('');
+  const isWorkingRef = useRef(false);
 
   useEffect(() => {
     loadProject();
@@ -33,19 +48,29 @@ export default function Workspace() {
   }, [projectId]);
 
   useEffect(() => {
-    if (!ceoConversationId) return;
-    const unsubscribe = base44.agents.subscribeToConversation(ceoConversationId, (data) => {
-      setCeoMessages(data.messages || []);
+    if (!conversationId) return;
+    const unsubscribe = base44.agents.subscribeToConversation(conversationId, (data) => {
+      setMessages(data.messages || []);
+      if (
+        isWorkingRef.current &&
+        !data.is_processing &&
+        data.messages?.some((m) => m.role === 'assistant')
+      ) {
+        isWorkingRef.current = false;
+        setIsWorking(false);
+        openPR();
+      }
     });
     return () => unsubscribe();
-  }, [ceoConversationId]);
+  }, [conversationId]);
 
   useEffect(() => {
-    return () => {
-      unsubRefs.current.forEach((fn) => fn && fn());
-      unsubRefs.current = [];
-    };
-  }, []);
+    if (!isWorking || !startTime) return;
+    const tick = () => setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isWorking, startTime]);
 
   const loadUser = async () => {
     try {
@@ -58,38 +83,27 @@ export default function Workspace() {
     try {
       const proj = await base44.entities.Project.get(projectId);
       setProject(proj);
-      setFileTree(proj.file_tree || '');
-
-      if (proj.repo_full_name) {
-        try {
-          const res = await base44.functions.invoke('githubRepoContents', { repo_full_name: proj.repo_full_name });
-          if (res.data?.key_files) setKeyFiles(res.data.key_files);
-          if (res.data?.file_tree) setFileTree(res.data.file_tree);
-        } catch (err) {
-          console.error('Failed to fetch repo contents:', err);
-        }
-      }
 
       const sessions = await base44.entities.Session.filter({ project_id: projectId });
       if (sessions.length > 0) {
-        const session = sessions[0];
-        setCeoConversationId(session.conversation_id);
-        const conv = await base44.agents.getConversation(session.conversation_id);
-        setCeoMessages(conv.messages || []);
+        const conv = await base44.agents.getConversation(sessions[0].conversation_id);
+        setConversationId(sessions[0].conversation_id);
+        setMessages(conv.messages || []);
       } else {
         const conv = await base44.agents.createConversation({
-          agent_name: 'oikos',
-          metadata: { name: proj.repo_name, description: `CEO session for ${proj.repo_name}` },
+          agent_name: 'consul',
+          metadata: { name: proj.repo_name, description: `Session for ${proj.repo_name}` },
         });
         await base44.entities.Session.create({
           project_id: projectId,
           conversation_id: conv.id,
-          title: `CEO session for ${proj.repo_name}`,
+          title: `Session for ${proj.repo_name}`,
         });
-        setCeoConversationId(conv.id);
+        setConversationId(conv.id);
       }
     } catch (err) {
       console.error('Failed to load project:', err);
+      setError('Failed to load project');
     } finally {
       setLoading(false);
     }
@@ -99,393 +113,91 @@ export default function Workspace() {
     const parts = [];
     if (project?.repo_full_name) parts.push(`Repository: ${project.repo_full_name}`);
     if (project?.stack) parts.push(`Stack: ${project.stack}`);
-    if (fileTree) {
-      const truncated = fileTree.length > 8000 ? fileTree.substring(0, 8000) + '\n... (truncated)' : fileTree;
+    if (project?.file_tree) {
+      const truncated = project.file_tree.length > 8000
+        ? project.file_tree.substring(0, 8000) + '\n... (truncated)'
+        : project.file_tree;
       parts.push(`File Tree:\n${truncated}`);
     }
-    if (Object.keys(keyFiles).length > 0) {
-      const filesCtx = Object.entries(keyFiles)
-        .map(([path, content]) => `--- ${path} ---\n${content}`)
-        .join('\n\n');
-      parts.push(`Key Files:\n${filesCtx}`);
+    if (branchRef.current) {
+      parts.push(
+        `Task Branch: ${branchRef.current}\nIMPORTANT: Pass { "branch": "${branchRef.current}" } on EVERY githubWrite call so changes land on this branch.`,
+      );
     }
     return parts.length > 0 ? `[PROJECT CONTEXT]\n${parts.join('\n')}\n\n[TASK]\n${task}` : task;
   };
 
-  const parseAssignments = (content) => {
-    if (!content) return { assignments: [], error: 'The CEO returned an empty response.' };
-
-    let jsonText = null;
-    const marked = content.match(/\[ASSIGNMENTS\]([\s\S]*?)\[\/ASSIGNMENTS\]/);
-    if (marked) {
-      jsonText = marked[1].trim();
-    } else {
-      const arr = content.match(/\[\s*\{[\s\S]*\}\s*\]/);
-      if (arr) jsonText = arr[0];
-    }
-    if (!jsonText) {
-      return { assignments: [], error: 'No [ASSIGNMENTS] block found in the CEO response.' };
-    }
-
-    let parsed;
+  const openPR = async () => {
+    if (!branchRef.current || !project?.repo_full_name) return;
     try {
-      parsed = JSON.parse(jsonText);
-    } catch (e) {
-      return { assignments: [], error: `The CEO produced invalid assignment JSON: ${e.message}` };
-    }
-    if (!Array.isArray(parsed)) {
-      return { assignments: [], error: 'The CEO assignments were not a JSON array.' };
-    }
-
-    const assignments = [];
-    for (const a of parsed) {
-      if (a && typeof a.agent === 'string' && typeof a.task === 'string') {
-        assignments.push({
-          agent: a.agent,
-          task: a.task,
-          depends_on: Array.isArray(a.depends_on) ? a.depends_on.filter((d) => typeof d === 'string') : [],
-        });
-      }
-    }
-    if (assignments.length === 0) {
-      return { assignments: [], error: 'No valid assignments found (each needs an "agent" and a "task").' };
-    }
-    return { assignments, error: null };
-  };
-
-  const orderIntoWaves = (assignments) => {
-    const names = new Set(assignments.map((a) => a.agent));
-    const done = new Set();
-    const remaining = [...assignments];
-    const waves = [];
-    let guard = 0;
-    while (remaining.length && guard++ < 100) {
-      const ready = remaining.filter((a) => a.depends_on.every((d) => !names.has(d) || done.has(d)));
-      const wave = ready.length ? ready : remaining.slice();
-      waves.push(wave);
-      wave.forEach((a) => {
-        done.add(a.agent);
-        const i = remaining.indexOf(a);
-        if (i >= 0) remaining.splice(i, 1);
-      });
-    }
-    return waves;
-  };
-
-  const extractTouched = (messages) => {
-    const map = new Map();
-    for (const m of messages || []) {
-      for (const tc of m.tool_calls || []) {
-        let args = {};
-        try { args = JSON.parse(tc.arguments_string); } catch {}
-        const op = args.operation;
-        const path = args.file_path || args.path;
-        const ok = ['completed', 'success'].includes(tc.status);
-        if (path && ok && ['write', 'edit', 'update', 'delete'].includes(op)) {
-          map.set(path, op);
-        }
-      }
-    }
-    return Array.from(map.entries()).map(([path, op]) => ({ path, op }));
-  };
-
-  const verifyOnBranch = async (branch) => {
-    if (!project?.repo_full_name || !branch) return null;
-    try {
-      const res = await base44.functions.invoke('verifyBranch', {
+      const res = await base44.functions.invoke('githubPullRequest', {
+        operation: 'open',
         repo_full_name: project.repo_full_name,
-        branch,
+        branch: branchRef.current,
+        title: `Consul: ${taskRef.current.substring(0, 60)}`,
+        pr_body: `Automated changes by Consul.\n\nTask: ${taskRef.current}\n\nReview before merging.`,
       });
-      return res.data || null;
+      if (res.data?.url) setPrUrl(res.data.url);
     } catch (err) {
-      console.error('Verification call failed:', err);
-      return { ran: false, passed: false, summary: err.message || 'verification service unreachable', failures: [] };
+      console.error('Failed to open PR:', err);
     }
-  };
-
-  const pollForCeoResponse = (convId, minMsgCount) => {
-    return new Promise((resolve, reject) => {
-      let attempts = 0;
-      const interval = setInterval(async () => {
-        attempts++;
-        try {
-          const conv = await base44.agents.getConversation(convId);
-          const msgs = conv.messages || [];
-          if (msgs.length > minMsgCount) {
-            clearInterval(interval);
-            for (let i = msgs.length - 1; i >= 0; i--) {
-              if (msgs[i].role === 'assistant') {
-                resolve(msgs[i]);
-                return;
-              }
-            }
-            resolve(msgs[msgs.length - 1]);
-          } else if (attempts > 150) {
-            clearInterval(interval);
-            reject(new Error('CEO took too long to respond'));
-          }
-        } catch {}
-      }, 2000);
-    });
-  };
-
-  const runSpecialist = (assignment, branch, priorFiles) => {
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (touched) => {
-        if (settled) return;
-        settled = true;
-        resolve(touched);
-      };
-
-      (async () => {
-        try {
-          const conv = await base44.agents.createConversation({
-            agent_name: assignment.agent,
-            metadata: {
-              name: `${assignment.agent} — ${assignment.task.substring(0, 50)}`,
-              description: assignment.task,
-            },
-          });
-
-          setSpecialists((prev) => ({
-            ...prev,
-            [assignment.agent]: { conversationId: conv.id, messages: [], status: 'working', task: assignment.task },
-          }));
-
-          const branchNote = branch
-            ? `\n\n[TASK BRANCH]\nAll file changes MUST target the branch "${branch}". Pass { "branch": "${branch}" } on every githubWrite write/edit/delete so changes land on the review branch, not the default branch.`
-            : '';
-          const coordNote = priorFiles.length
-            ? `\n\n[COORDINATION]\nOther agents in this run already modified these files. READ their current state before touching them and do not overwrite unrelated work:\n${priorFiles.map((f) => `- ${f.path} (${f.op})`).join('\n')}`
-            : '';
-
-          const specialistContext = buildContext(assignment.task) + branchNote + coordNote;
-          await base44.agents.addMessage(conv, { role: 'user', content: specialistContext });
-
-          let lastMessages = [];
-          const unsub = base44.agents.subscribeToConversation(conv.id, (data) => {
-            lastMessages = data.messages || [];
-            setSpecialists((prev) => ({
-              ...prev,
-              [assignment.agent]: {
-                ...prev[assignment.agent],
-                messages: lastMessages,
-                status: data.is_processing ? 'working' : 'done',
-              },
-            }));
-            if (!data.is_processing && lastMessages.some((m) => m.role === 'assistant')) {
-              finish(extractTouched(lastMessages));
-            }
-          });
-          unsubRefs.current.push(unsub);
-
-          setTimeout(() => {
-            setSpecialists((prev) =>
-              prev[assignment.agent]?.status === 'working'
-                ? { ...prev, [assignment.agent]: { ...prev[assignment.agent], status: 'done' } }
-                : prev,
-            );
-            finish(extractTouched(lastMessages));
-          }, 180000);
-        } catch (err) {
-          console.error(`Specialist ${assignment.agent} failed:`, err);
-          setSpecialists((prev) => ({
-            ...prev,
-            [assignment.agent]: {
-              ...(prev[assignment.agent] || {}),
-              status: 'failed',
-              task: assignment.task,
-              messages: prev[assignment.agent]?.messages || [],
-            },
-          }));
-          finish([]);
-        }
-      })();
-    });
   };
 
   const handleTask = async (e) => {
     e?.preventDefault();
-    if (!input.trim() || isOrchestrating) return;
+    if (!input.trim() || isWorking) return;
 
     const task = input.trim();
+    taskRef.current = task;
     setInput('');
     setError('');
-    setNotice('');
     setPrUrl('');
-    setVerification(null);
-    setIsVerifying(false);
-    setIsOrchestrating(true);
-
-    unsubRefs.current.forEach((fn) => fn && fn());
-    unsubRefs.current = [];
-    setSpecialists({});
-
-    const contextMessage = buildContext(task);
-    const msgCountBefore = ceoMessages.length;
-    setCeoMessages((prev) => [...prev, { role: 'user', content: contextMessage }]);
+    setElapsed(0);
 
     try {
-      const ceoConv = await base44.agents.getConversation(ceoConversationId);
-      await base44.agents.addMessage(ceoConv, { role: 'user', content: contextMessage });
-
-      const ceoResponse = await pollForCeoResponse(ceoConversationId, msgCountBefore + 1);
-
-      const { assignments, error: parseError } = parseAssignments(ceoResponse.content);
-      if (parseError) {
-        setError(parseError);
-        setIsOrchestrating(false);
-        return;
-      }
-
-      const allowedAgents = (PLANS[userPlan] || PLANS.free).agents;
-      const validAssignments = assignments.filter((a) => allowedAgents.includes(a.agent));
-      const skipped = assignments.filter((a) => !allowedAgents.includes(a.agent));
-
-      if (validAssignments.length === 0) {
-        setError(
-          `Every assigned agent is above your ${PLANS[userPlan]?.name} plan. Upgrade to deploy: ${assignments.map((a) => a.agent).join(', ')}.`,
-        );
-        setIsOrchestrating(false);
-        return;
-      }
-      if (skipped.length) {
-        setNotice(`Skipped ${skipped.length} agent(s) not in your plan: ${skipped.map((a) => a.agent).join(', ')}.`);
-      }
-
-      let branch = '';
       if (project?.repo_full_name) {
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         try {
-          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
           const res = await base44.functions.invoke('githubPullRequest', {
             operation: 'ensure_branch',
             repo_full_name: project.repo_full_name,
             branch: `consul/${stamp}`,
           });
-          if (res.data?.branch) branch = res.data.branch;
+          if (res.data?.branch) branchRef.current = res.data.branch;
         } catch (err) {
-          console.error('Failed to create review branch:', err);
+          console.error('Failed to create branch:', err);
         }
       }
 
-      const waves = orderIntoWaves(validAssignments);
-      const modifiedFiles = [];
-      const recordTouched = (agent, touched) => {
-        touched.forEach((f) => {
-          const existing = modifiedFiles.find((m) => m.path === f.path);
-          if (existing) {
-            existing.op = f.op;
-            existing.agent = agent;
-          } else {
-            modifiedFiles.push({ path: f.path, op: f.op, agent });
-          }
-        });
-      };
-      for (const wave of waves) {
-        const results = await Promise.all(wave.map((a) => runSpecialist(a, branch, [...modifiedFiles])));
-        wave.forEach((a, i) => recordTouched(a.agent, results[i] || []));
-      }
+      const contextMessage = buildContext(task);
+      const conv = await base44.agents.getConversation(conversationId);
+      await base44.agents.addMessage(conv, { role: 'user', content: contextMessage });
 
-      const MAX_REPAIRS = 2;
-      let verificationResult = null;
-      let repairPasses = 0;
-      if (branch && project?.repo_full_name && modifiedFiles.length) {
-        setIsVerifying(true);
-        verificationResult = await verifyOnBranch(branch);
-
-        while (verificationResult?.ran && !verificationResult?.passed && repairPasses < MAX_REPAIRS) {
-          const failingPaths = new Set((verificationResult.failures || []).map((f) => f.file).filter(Boolean));
-          const allAgents = [...new Set(modifiedFiles.map((f) => f.agent).filter(Boolean))];
-          const implicatedAgents = failingPaths.size
-            ? [...new Set(modifiedFiles.filter((f) => failingPaths.has(f.path)).map((f) => f.agent).filter(Boolean))]
-            : [];
-          const repairAgents = (implicatedAgents.length ? implicatedAgents : allAgents).filter((a) =>
-            allowedAgents.includes(a),
-          );
-          if (!repairAgents.length) break;
-
-          repairPasses++;
-          setNotice((n) => `${n ? n + ' ' : ''}Verification failed — repair pass ${repairPasses}/${MAX_REPAIRS} to ${repairAgents.join(', ')}.`);
-          const failureText =
-            (verificationResult.failures || [])
-              .slice(0, 10)
-              .map((f) => `- ${f.file ? f.file + ': ' : ''}${f.label} — ${f.detail}`)
-              .join('\n') || verificationResult.summary;
-
-          const repairAssignments = repairAgents.map((agent) => ({
-            agent,
-            task: `Fix this verification failure on branch "${branch}" (repair attempt ${repairPasses}). Re-read the current file state first — it may differ from what you last wrote.\n\n${failureText}`,
-            depends_on: [],
-          }));
-          const repairResults = await Promise.all(
-            repairAssignments.map((a) => runSpecialist(a, branch, [...modifiedFiles])),
-          );
-          repairAssignments.forEach((a, i) => recordTouched(a.agent, repairResults[i] || []));
-
-          if (!repairResults.some((r) => (r || []).length > 0)) {
-            setNotice((n) => `${n ? n + ' ' : ''}Repair pass ${repairPasses} produced no changes — stopping.`);
-            break;
-          }
-
-          const reverified = await verifyOnBranch(branch);
-          verificationResult = reverified
-            ? { ...reverified, repaired: true, repairPasses }
-            : verificationResult;
-        }
-        setIsVerifying(false);
-        setVerification(verificationResult);
-      }
-
-      if (branch && project?.repo_full_name && modifiedFiles.length) {
-        try {
-          const verifyLine = !verificationResult
-            ? ''
-            : verificationResult.ran
-              ? `\nVerification: ${verificationResult.passed ? 'passed' : 'FAILED'}${verificationResult.repaired ? ` (after ${verificationResult.repairPasses} repair pass${verificationResult.repairPasses > 1 ? 'es' : ''})` : ''} — ${verificationResult.summary}`
-              : `\nVerification: skipped — ${verificationResult.summary || 'no verify service configured'}`;
-          const res = await base44.functions.invoke('githubPullRequest', {
-            operation: 'open',
-            repo_full_name: project.repo_full_name,
-            branch,
-            title: `Consul: ${task.substring(0, 60)}`,
-            pr_body: `Automated changes from the Consul multi-agent platform.\n\nTask: ${task}\n${verifyLine}\n\nFiles changed:\n${modifiedFiles.map((f) => `- ${f.path} (${f.op})`).join('\n')}\n\nReview before merging.`,
-          });
-          if (res.data?.url) setPrUrl(res.data.url);
-        } catch (err) {
-          console.error('Failed to open PR:', err);
-          setNotice((n) => `${n ? n + ' ' : ''}Changes landed on branch "${branch}", but opening the PR failed — open it manually.`);
-        }
-      }
-
-      setIsOrchestrating(false);
+      isWorkingRef.current = true;
+      setIsWorking(true);
+      setStartTime(Date.now());
     } catch (err) {
-      console.error('Orchestration failed:', err);
-      setError(err.message || 'Failed to process task');
-      setIsOrchestrating(false);
+      console.error('Failed to send task:', err);
+      setError(err.message || 'Failed to send task');
+      setIsWorking(false);
+      isWorkingRef.current = false;
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center font-mono">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[#5046E5]" />
-          <span className="text-sm text-black/30">Loading workspace...</span>
-        </div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-[#5046E5]" />
       </div>
     );
   }
 
-  const activeAgentNames = Object.entries(specialists)
-    .filter(([, s]) => s.status === 'working')
-    .map(([name]) => name);
-  const specialistEntries = Object.entries(specialists);
+  const stats = computeStats(messages);
 
   return (
     <div className="h-screen flex flex-col bg-white text-black font-body">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-black/[0.06] bg-white shrink-0">
+      <header className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-black/[0.06] shrink-0">
         <Link to="/" className="flex items-center gap-2 shrink-0">
           <Logo size={22} />
           <span className="font-heading font-bold text-sm tracking-tight hidden sm:block">Consul</span>
@@ -499,163 +211,113 @@ export default function Workspace() {
           <span className="text-sm font-semibold truncate">{project?.repo_full_name}</span>
         </div>
         {project?.stack && (
-          <span className="text-[11px] text-[#5046E5] bg-[#5046E5]/[0.08] px-2 py-0.5 rounded font-medium hidden sm:block">{project.stack}</span>
+          <span className="text-[11px] text-[#5046E5] bg-[#5046E5]/[0.08] px-2 py-0.5 rounded font-medium hidden sm:block">
+            {project.stack}
+          </span>
         )}
-        <div className="ml-auto flex items-center gap-2 shrink-0">
-          <Link
-            to="/plans"
-            className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
-              PLANS[userPlan]?.accent ? 'bg-[#5046E5] text-white border-[#5046E5] hover:bg-[#5046E5]/90' : 'bg-[#0D0D0D] text-white border-[#0D0D0D] hover:bg-black/80'
-            }`}
-          >
-            {PLANS[userPlan]?.name.toUpperCase()}
-          </Link>
-        </div>
+        <Link
+          to="/plans"
+          className="ml-auto text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-[#0D0D0D] text-white hover:bg-black/80 transition-colors shrink-0"
+        >
+          {PLANS[userPlan]?.name?.toUpperCase() || 'FREE'}
+        </Link>
       </header>
 
-      {/* Main */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Agent Roster */}
-        <aside className="w-56 hidden lg:flex flex-col shrink-0">
-          <AgentRoster currentPlan={userPlan} activeAgents={activeAgentNames} />
-        </aside>
+      {/* Chat area */}
+      <div className="flex-1 overflow-y-auto">
+        <ChatMessages messages={messages} isStreaming={isWorking} />
+      </div>
 
-        {/* Center: CEO Chat */}
-        <div className="flex-1 flex flex-col min-w-0 md:border-r md:border-black/[0.06]">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-black/[0.06] bg-[#5046E5]/[0.02] shrink-0">
-            <Crown className="w-4 h-4 text-[#5046E5]" />
-            <span className="text-xs font-semibold">Oikos (CEO)</span>
-            <span className="text-[10px] text-black/30 hidden sm:block">— breaks down tasks & delegates</span>
-            {isOrchestrating && (
-              <div className="ml-auto flex items-center gap-1.5">
-                <Loader2 className="w-3 h-3 animate-spin text-[#5046E5]" />
-                <span className="text-[10px] text-black/40">delegating...</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <ChatMessages messages={ceoMessages} isStreaming={isOrchestrating} />
-          </div>
-
-          {/* Input */}
-          <div className="border-t border-black/[0.06] px-3 py-2 shrink-0 bg-white">
-            {isVerifying && (
-              <div className="mb-2 px-3 py-1.5 rounded-lg border border-black/[0.06] text-black/50 text-xs bg-[#FAFAFA] flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#5046E5]" />
-                Running real verification (tests/build) on the branch...
-              </div>
-            )}
-            {verification && verification.ran && (
-              <div className={`mb-2 px-3 py-1.5 rounded-lg border text-xs ${verification.passed ? 'border-[#5046E5]/20 bg-[#5046E5]/[0.04]' : 'border-red-200 text-red-600 bg-red-50'}`}>
-                <div className="flex items-center gap-2">
-                  {verification.passed ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-[#5046E5]" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
-                  <span className="font-semibold">
-                    {verification.passed ? 'Verified — real tests passed' : 'Verification failed'}
-                    {verification.repaired ? ` (after ${verification.repairPasses} repair pass${verification.repairPasses > 1 ? 'es' : ''})` : ''}
-                  </span>
-                </div>
-                {verification.summary && <p className="mt-1 text-black/50">{verification.summary}</p>}
-                {!verification.passed && verification.failures?.length > 0 && (
-                  <ul className="mt-1 space-y-0.5">
-                    {verification.failures.slice(0, 5).map((f, i) => (
-                      <li key={i} className="text-black/40 truncate">{f.file ? `${f.file}: ` : ''}{f.label} — {f.detail}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            {verification && !verification.ran && (
-              <div className="mb-2 px-3 py-1.5 rounded-lg border border-black/[0.06] text-black/40 text-xs bg-[#FAFAFA]">
-                Verification skipped — {verification.summary || 'no verify service configured'}
-              </div>
-            )}
-            {prUrl && (
-              <div className="mb-2 px-3 py-1.5 rounded-lg border border-[#5046E5]/20 text-xs bg-[#5046E5]/[0.04] flex items-center gap-2">
-                <GitPullRequest className="w-3.5 h-3.5 shrink-0 text-[#5046E5]" />
-                <span className="font-semibold text-[#5046E5]">Pull request opened.</span>
-                <a href={prUrl} target="_blank" rel="noreferrer" className="underline hover:no-underline">Review changes →</a>
-              </div>
-            )}
-            {notice && (
-              <div className="mb-2 px-3 py-1.5 rounded-lg border border-black/[0.06] text-black/50 text-xs bg-[#FAFAFA]">
-                {notice}
-              </div>
-            )}
-            {error && (
-              <div className="mb-2 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs bg-red-50">
-                {error}
-              </div>
-            )}
-            <form onSubmit={handleTask}>
-              <div className={`flex items-end gap-2 rounded-xl border transition-all ${
-                isOrchestrating ? 'border-black/[0.06] bg-[#FAFAFA]' : 'border-black/[0.08] bg-white focus-within:border-[#5046E5]/40 focus-within:ring-2 focus-within:ring-[#5046E5]/10'
-              }`}>
-                <span className="text-[13px] text-[#5046E5] pl-3 py-2.5 select-none shrink-0 font-bold">›</span>
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleTask(e);
-                    }
-                  }}
-                  placeholder={isOrchestrating ? 'CEO is delegating...' : 'Describe what you want built...'}
-                  className="flex-1 bg-transparent text-[13px] text-black placeholder-black/20 outline-none resize-none py-2.5 pr-3 min-h-[20px] max-h-32"
-                  disabled={isOrchestrating}
-                  rows={1}
-                />
-                <button
-                  type="submit"
-                  disabled={isOrchestrating || !input.trim()}
-                  className="m-1 p-1.5 rounded-lg bg-[#0D0D0D] text-white hover:bg-black/80 disabled:opacity-20 transition-opacity shrink-0"
-                >
-                  {isOrchestrating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-              <div className="flex items-center justify-between px-1 mt-1">
-                <span className="text-[10px] text-black/20">enter to send · shift+enter for newline</span>
-                <span className="text-[10px] text-black/20 hidden sm:block">CEO → specialists</span>
-              </div>
-            </form>
-          </div>
+      {/* Stats bar */}
+      {(isWorking || stats.reads > 0 || stats.writes > 0 || prUrl) && (
+        <div className="flex items-center gap-4 px-4 md:px-8 py-2 border-t border-black/[0.06] bg-[#FAFAFA] shrink-0">
+          {isWorking ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#5046E5]" />
+              <span className="text-xs font-medium text-[#5046E5]">Working</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-[#5046E5]" />
+              <span className="text-xs font-medium text-black/60">Done</span>
+            </div>
+          )}
+          {isWorking && startTime && (
+            <span className="flex items-center gap-1 text-xs text-black/40 font-mono">
+              <Clock className="w-3 h-3" />
+              {Math.floor(elapsed / 60)}m {elapsed % 60}s
+            </span>
+          )}
+          {stats.reads > 0 && (
+            <span className="flex items-center gap-1 text-xs text-black/40">
+              <FileSearch className="w-3 h-3" />
+              <span className="font-bold">{stats.reads}</span> read
+            </span>
+          )}
+          {stats.writes > 0 && (
+            <span className="flex items-center gap-1 text-xs text-[#5046E5]">
+              <FilePen className="w-3 h-3" />
+              <span className="font-bold">{stats.writes}</span> written
+            </span>
+          )}
+          {prUrl && (
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto flex items-center gap-1.5 text-xs font-medium text-[#5046E5] hover:underline"
+            >
+              <GitPullRequest className="w-3.5 h-3.5" />
+              Review PR →
+            </a>
+          )}
         </div>
+      )}
 
-        {/* Right: Specialist Panels */}
-        <div className="flex-1 hidden md:flex flex-col min-w-0 bg-[#FAFAFA]">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-black/[0.06] bg-white shrink-0">
-            <Layers className="w-4 h-4 text-black/50" />
-            <span className="text-xs font-semibold">Specialist Agents</span>
-            {specialistEntries.length > 0 && (
-              <span className="text-[10px] bg-[#5046E5] text-white px-1.5 py-0.5 rounded-full font-bold ml-auto">
-                {specialistEntries.length} active
-              </span>
-            )}
+      {/* Input */}
+      <div className="border-t border-black/[0.06] px-3 py-2 shrink-0 bg-white">
+        {error && (
+          <div className="mb-2 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs bg-red-50 flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            {error}
           </div>
-
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {specialistEntries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center px-6">
-                <Layers className="w-8 h-8 text-black/10 mb-3" />
-                <p className="text-sm font-semibold text-black/40">No agents deployed yet</p>
-                <p className="text-xs text-black/30 mt-1 max-w-xs leading-relaxed">
-                  Submit a task to Oikos. The CEO will break it down and deploy specialist agents to work in parallel.
-                </p>
-              </div>
-            ) : (
-              specialistEntries.map(([agentName, spec]) => (
-                <AgentPanel
-                  key={agentName}
-                  agentName={agentName}
-                  messages={spec.messages}
-                  status={spec.status}
-                  task={spec.task}
-                />
-              ))
-            )}
+        )}
+        <form onSubmit={handleTask}>
+          <div
+            className={`flex items-end gap-2 rounded-xl border transition-all ${
+              isWorking
+                ? 'border-black/[0.06] bg-[#FAFAFA]'
+                : 'border-black/[0.08] bg-white focus-within:border-[#5046E5]/40 focus-within:ring-2 focus-within:ring-[#5046E5]/10'
+            }`}
+          >
+            <span className="text-[13px] text-[#5046E5] pl-3 py-2.5 select-none shrink-0 font-bold">›</span>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleTask(e);
+                }
+              }}
+              placeholder={isWorking ? 'Consul is working...' : 'Tell Consul what to build...'}
+              className="flex-1 bg-transparent text-[13px] text-black placeholder-black/20 outline-none resize-none py-2.5 pr-3 min-h-[20px] max-h-32"
+              disabled={isWorking}
+              rows={1}
+            />
+            <button
+              type="submit"
+              disabled={isWorking || !input.trim()}
+              className="m-1 p-1.5 rounded-lg bg-[#0D0D0D] text-white hover:bg-black/80 disabled:opacity-20 transition-opacity shrink-0"
+            >
+              {isWorking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            </button>
           </div>
-        </div>
+          <div className="flex items-center justify-between px-1 mt-1">
+            <span className="text-[10px] text-black/20">enter to send · shift+enter for newline</span>
+            <span className="text-[10px] text-black/20 hidden sm:block">reads · writes · commits in real time</span>
+          </div>
+        </form>
       </div>
     </div>
   );
