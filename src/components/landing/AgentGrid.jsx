@@ -18,20 +18,20 @@ const agents = [
 export default function AgentGrid() {
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/[0.06] rounded-xl overflow-hidden border border-white/[0.06]">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-black/[0.06] rounded-xl overflow-hidden border border-black/[0.06]">
         {agents.map((agent, i) => (
-          <div key={i} className="bg-[#0D0D0F] p-6 hover:bg-[#131316] transition-colors group">
-            <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4 group-hover:bg-[#C8FF00] transition-colors">
-              <agent.icon className="w-5 h-5 text-white/60 group-hover:text-black transition-colors" />
+          <div key={i} className="bg-white p-6 hover:bg-[#FAFAFA] transition-colors group">
+            <div className="w-10 h-10 rounded-lg bg-[#F4F4F5] flex items-center justify-center mb-4 group-hover:bg-[#5046E5] transition-colors">
+              <agent.icon className="w-5 h-5 text-black/50 group-hover:text-white transition-colors" />
             </div>
-            <h3 className="text-sm font-semibold text-white mb-1">{agent.name}</h3>
-            <p className="text-xs text-white/40">{agent.desc}</p>
+            <h3 className="text-sm font-semibold text-black mb-1">{agent.name}</h3>
+            <p className="text-xs text-black/40">{agent.desc}</p>
           </div>
         ))}
       </div>
       <div className="flex items-center justify-center gap-2 mt-6">
-        <span className="text-sm text-white/40">+ 14 more specialists</span>
-        <Link to="/plans" className="text-sm text-[#C8FF00] hover:underline">View all →</Link>
+        <span className="text-sm text-black/40">+ 14 more specialists</span>
+        <Link to="/plans" className="text-sm text-[#5046E5] hover:underline">View all →</Link>
       </div>
     </div>
   );

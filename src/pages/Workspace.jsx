@@ -6,6 +6,7 @@ import { PLANS } from '@/lib/plans';
 import ChatMessages from '@/components/ChatMessages';
 import AgentPanel from '@/components/AgentPanel';
 import AgentRoster from '@/components/AgentRoster';
+import Logo from '@/components/Logo';
 
 export default function Workspace() {
   const { projectId } = useParams();
@@ -111,8 +112,6 @@ export default function Workspace() {
     return parts.length > 0 ? `[PROJECT CONTEXT]\n${parts.join('\n')}\n\n[TASK]\n${task}` : task;
   };
 
-  // Parse the CEO's assignment block. Returns { assignments, error } so the caller
-  // can surface failures to the user instead of silently dispatching nothing.
   const parseAssignments = (content) => {
     if (!content) return { assignments: [], error: 'The CEO returned an empty response.' };
 
@@ -121,7 +120,6 @@ export default function Workspace() {
     if (marked) {
       jsonText = marked[1].trim();
     } else {
-      // Fallback: the first JSON array of objects anywhere in the message.
       const arr = content.match(/\[\s*\{[\s\S]*\}\s*\]/);
       if (arr) jsonText = arr[0];
     }
@@ -155,9 +153,6 @@ export default function Workspace() {
     return { assignments, error: null };
   };
 
-  // Order assignments into execution waves based on depends_on. Assignments whose
-  // prerequisites are all satisfied run together (in parallel); the next wave waits.
-  // Unknown or cyclic dependencies are broken by running the remainder as one wave.
   const orderIntoWaves = (assignments) => {
     const names = new Set(assignments.map((a) => a.agent));
     const done = new Set();
@@ -177,8 +172,6 @@ export default function Workspace() {
     return waves;
   };
 
-  // Pull the files a specialist actually wrote/edited/deleted from its tool calls,
-  // deduped by path (last operation wins). Used to coordinate later waves.
   const extractTouched = (messages) => {
     const map = new Map();
     for (const m of messages || []) {
@@ -196,10 +189,6 @@ export default function Workspace() {
     return Array.from(map.entries()).map(([path, op]) => ({ path, op }));
   };
 
-  // Ask the Consul verify service to clone the branch and run the repo's real
-  // test/typecheck/build command. Returns null when there's nothing to verify
-  // against; on a service/network failure, returns a synthetic "skipped" result
-  // rather than throwing, so a missing CONSUL_VERIFY_URL degrades gracefully.
   const verifyOnBranch = async (branch) => {
     if (!project?.repo_full_name || !branch) return null;
     try {
@@ -240,8 +229,6 @@ export default function Workspace() {
     });
   };
 
-  // Dispatch a single specialist and resolve with the files it touched once it
-  // stops processing (or after a safety timeout, so one stuck agent can't block the run).
   const runSpecialist = (assignment, branch, priorFiles) => {
     return new Promise((resolve) => {
       let settled = false;
@@ -293,7 +280,6 @@ export default function Workspace() {
           });
           unsubRefs.current.push(unsub);
 
-          // Safety timeout: don't let a stuck specialist stall the whole orchestration.
           setTimeout(() => {
             setSpecialists((prev) =>
               prev[assignment.agent]?.status === 'working'
@@ -332,7 +318,6 @@ export default function Workspace() {
     setIsVerifying(false);
     setIsOrchestrating(true);
 
-    // Clear previous specialist subscriptions
     unsubRefs.current.forEach((fn) => fn && fn());
     unsubRefs.current = [];
     setSpecialists({});
@@ -369,8 +354,6 @@ export default function Workspace() {
         setNotice(`Skipped ${skipped.length} agent(s) not in your plan: ${skipped.map((a) => a.agent).join(', ')}.`);
       }
 
-      // Create a review branch so specialist changes open a PR instead of
-      // committing straight to the default branch.
       let branch = '';
       if (project?.repo_full_name) {
         try {
@@ -386,9 +369,6 @@ export default function Workspace() {
         }
       }
 
-      // Execute in dependency-ordered waves, accumulating modified files (with the
-      // agent that touched each one, last writer wins) so later waves — and a
-      // possible repair pass — know what earlier agents changed and who to ask.
       const waves = orderIntoWaves(validAssignments);
       const modifiedFiles = [];
       const recordTouched = (agent, touched) => {
@@ -407,12 +387,6 @@ export default function Workspace() {
         wave.forEach((a, i) => recordTouched(a.agent, results[i] || []));
       }
 
-      // Verify on the branch: clone it, run the repo's real test/typecheck/build
-      // command, and report pass/fail — this is the step that turns "the agents
-      // said they're done" into "the code actually works." On failure, loop a
-      // bounded repair: re-dispatch to the agent(s) whose files are implicated,
-      // re-verify, and repeat until green, out of attempts, or a pass makes no
-      // changes (the same "no progress → stop" floor Consul's repair loop uses).
       const MAX_REPAIRS = 2;
       let verificationResult = null;
       let repairPasses = 0;
@@ -449,8 +423,6 @@ export default function Workspace() {
           );
           repairAssignments.forEach((a, i) => recordTouched(a.agent, repairResults[i] || []));
 
-          // No progress → stop, exactly like Consul's keyless floor: re-verifying
-          // an unchanged tree would just return the same failure.
           if (!repairResults.some((r) => (r || []).length > 0)) {
             setNotice((n) => `${n ? n + ' ' : ''}Repair pass ${repairPasses} produced no changes — stopping.`);
             break;
@@ -465,8 +437,6 @@ export default function Workspace() {
         setVerification(verificationResult);
       }
 
-      // Open a PR for the user to review once the specialists finish, regardless
-      // of verification outcome — never lose the work, just report the real state.
       if (branch && project?.repo_full_name && modifiedFiles.length) {
         try {
           const verifyLine = !verificationResult
@@ -500,8 +470,8 @@ export default function Workspace() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center font-mono">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-black" />
-          <span className="text-sm text-gray-400">Loading workspace...</span>
+          <Loader2 className="w-6 h-6 animate-spin text-[#5046E5]" />
+          <span className="text-sm text-black/30">Loading workspace...</span>
         </div>
       </div>
     );
@@ -513,28 +483,29 @@ export default function Workspace() {
   const specialistEntries = Object.entries(specialists);
 
   return (
-    <div className="h-screen flex flex-col bg-white text-black font-mono">
-      <div className="h-1 bg-editorial shrink-0" />
-
+    <div className="h-screen flex flex-col bg-white text-black font-body">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-black bg-white shrink-0">
-        <Link to="/" className="font-bold text-base tracking-tight shrink-0">Consul</Link>
-        <div className="w-px h-4 bg-black shrink-0" />
-        <Link to="/dashboard" className="text-gray-400 hover:text-black transition-colors shrink-0">
+      <header className="flex items-center gap-3 px-4 md:px-6 py-3 border-b border-black/[0.06] bg-white shrink-0">
+        <Link to="/" className="flex items-center gap-2 shrink-0">
+          <Logo size={22} />
+          <span className="font-heading font-bold text-sm tracking-tight hidden sm:block">Consul</span>
+        </Link>
+        <div className="w-px h-5 bg-black/[0.08] shrink-0" />
+        <Link to="/dashboard" className="text-black/30 hover:text-black transition-colors shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex items-center gap-2 min-w-0">
-          <Github className="w-4 h-4 shrink-0" />
-          <span className="text-sm font-bold truncate">{project?.repo_full_name}</span>
+          <Github className="w-4 h-4 shrink-0 text-black/40" />
+          <span className="text-sm font-semibold truncate">{project?.repo_full_name}</span>
         </div>
         {project?.stack && (
-          <span className="text-xs text-black bg-editorial px-2 py-0.5 rounded font-bold hidden sm:block">{project.stack}</span>
+          <span className="text-[11px] text-[#5046E5] bg-[#5046E5]/[0.08] px-2 py-0.5 rounded font-medium hidden sm:block">{project.stack}</span>
         )}
         <div className="ml-auto flex items-center gap-2 shrink-0">
           <Link
             to="/plans"
-            className={`text-[10px] font-bold px-2.5 py-1 rounded border border-black transition-colors ${
-              PLANS[userPlan]?.accent ? 'bg-editorial hover:bg-black hover:text-editorial' : 'bg-black text-white hover:bg-gray-800'
+            className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+              PLANS[userPlan]?.accent ? 'bg-[#5046E5] text-white border-[#5046E5] hover:bg-[#5046E5]/90' : 'bg-[#0D0D0D] text-white border-[#0D0D0D] hover:bg-black/80'
             }`}
           >
             {PLANS[userPlan]?.name.toUpperCase()}
@@ -545,20 +516,20 @@ export default function Workspace() {
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Agent Roster */}
-        <aside className="w-56 border-r border-black hidden lg:flex flex-col shrink-0">
+        <aside className="w-56 hidden lg:flex flex-col shrink-0">
           <AgentRoster currentPlan={userPlan} activeAgents={activeAgentNames} />
         </aside>
 
         {/* Center: CEO Chat */}
-        <div className="flex-1 flex flex-col min-w-0 md:border-r md:border-black">
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-black bg-[#FFFBEA] shrink-0">
-            <Crown className="w-4 h-4" />
-            <span className="text-xs font-bold">Oikos (CEO)</span>
-            <span className="text-[10px] text-gray-400 hidden sm:block">— breaks down tasks & delegates</span>
+        <div className="flex-1 flex flex-col min-w-0 md:border-r md:border-black/[0.06]">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-black/[0.06] bg-[#5046E5]/[0.02] shrink-0">
+            <Crown className="w-4 h-4 text-[#5046E5]" />
+            <span className="text-xs font-semibold">Oikos (CEO)</span>
+            <span className="text-[10px] text-black/30 hidden sm:block">— breaks down tasks & delegates</span>
             {isOrchestrating && (
               <div className="ml-auto flex items-center gap-1.5">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span className="text-[10px] text-gray-500">delegating...</span>
+                <Loader2 className="w-3 h-3 animate-spin text-[#5046E5]" />
+                <span className="text-[10px] text-black/40">delegating...</span>
               </div>
             )}
           </div>
@@ -568,59 +539,59 @@ export default function Workspace() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-black px-3 py-2 shrink-0 bg-white">
+          <div className="border-t border-black/[0.06] px-3 py-2 shrink-0 bg-white">
             {isVerifying && (
-              <div className="mb-2 px-3 py-1.5 rounded border border-gray-300 text-gray-600 text-xs bg-gray-50 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+              <div className="mb-2 px-3 py-1.5 rounded-lg border border-black/[0.06] text-black/50 text-xs bg-[#FAFAFA] flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#5046E5]" />
                 Running real verification (tests/build) on the branch...
               </div>
             )}
             {verification && verification.ran && (
-              <div className={`mb-2 px-3 py-1.5 rounded border text-xs ${verification.passed ? 'border-black bg-editorial' : 'border-black text-red-600 bg-[#FFFBEA]'}`}>
+              <div className={`mb-2 px-3 py-1.5 rounded-lg border text-xs ${verification.passed ? 'border-[#5046E5]/20 bg-[#5046E5]/[0.04]' : 'border-red-200 text-red-600 bg-red-50'}`}>
                 <div className="flex items-center gap-2">
-                  {verification.passed ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
-                  <span className="font-bold">
+                  {verification.passed ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-[#5046E5]" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+                  <span className="font-semibold">
                     {verification.passed ? 'Verified — real tests passed' : 'Verification failed'}
                     {verification.repaired ? ` (after ${verification.repairPasses} repair pass${verification.repairPasses > 1 ? 'es' : ''})` : ''}
                   </span>
                 </div>
-                {verification.summary && <p className="mt-1 text-gray-600">{verification.summary}</p>}
+                {verification.summary && <p className="mt-1 text-black/50">{verification.summary}</p>}
                 {!verification.passed && verification.failures?.length > 0 && (
                   <ul className="mt-1 space-y-0.5">
                     {verification.failures.slice(0, 5).map((f, i) => (
-                      <li key={i} className="text-gray-500 truncate">{f.file ? `${f.file}: ` : ''}{f.label} — {f.detail}</li>
+                      <li key={i} className="text-black/40 truncate">{f.file ? `${f.file}: ` : ''}{f.label} — {f.detail}</li>
                     ))}
                   </ul>
                 )}
               </div>
             )}
             {verification && !verification.ran && (
-              <div className="mb-2 px-3 py-1.5 rounded border border-gray-300 text-gray-500 text-xs bg-gray-50">
+              <div className="mb-2 px-3 py-1.5 rounded-lg border border-black/[0.06] text-black/40 text-xs bg-[#FAFAFA]">
                 Verification skipped — {verification.summary || 'no verify service configured'}
               </div>
             )}
             {prUrl && (
-              <div className="mb-2 px-3 py-1.5 rounded border border-black text-xs bg-editorial flex items-center gap-2">
-                <GitPullRequest className="w-3.5 h-3.5 shrink-0" />
-                <span className="font-bold">Pull request opened.</span>
+              <div className="mb-2 px-3 py-1.5 rounded-lg border border-[#5046E5]/20 text-xs bg-[#5046E5]/[0.04] flex items-center gap-2">
+                <GitPullRequest className="w-3.5 h-3.5 shrink-0 text-[#5046E5]" />
+                <span className="font-semibold text-[#5046E5]">Pull request opened.</span>
                 <a href={prUrl} target="_blank" rel="noreferrer" className="underline hover:no-underline">Review changes →</a>
               </div>
             )}
             {notice && (
-              <div className="mb-2 px-3 py-1.5 rounded border border-gray-300 text-gray-600 text-xs bg-gray-50">
+              <div className="mb-2 px-3 py-1.5 rounded-lg border border-black/[0.06] text-black/50 text-xs bg-[#FAFAFA]">
                 {notice}
               </div>
             )}
             {error && (
-              <div className="mb-2 px-3 py-1.5 rounded border border-black text-red-600 text-xs bg-[#FFFBEA]">
+              <div className="mb-2 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs bg-red-50">
                 {error}
               </div>
             )}
             <form onSubmit={handleTask}>
-              <div className={`flex items-end gap-2 rounded-md border-2 transition-all ${
-                isOrchestrating ? 'border-gray-200 bg-gray-50' : 'border-black bg-white focus-within:border-editorial'
+              <div className={`flex items-end gap-2 rounded-xl border transition-all ${
+                isOrchestrating ? 'border-black/[0.06] bg-[#FAFAFA]' : 'border-black/[0.08] bg-white focus-within:border-[#5046E5]/40 focus-within:ring-2 focus-within:ring-[#5046E5]/10'
               }`}>
-                <span className="text-[13px] text-black pl-3 py-2.5 select-none shrink-0 font-bold">›</span>
+                <span className="text-[13px] text-[#5046E5] pl-3 py-2.5 select-none shrink-0 font-bold">›</span>
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -631,33 +602,33 @@ export default function Workspace() {
                     }
                   }}
                   placeholder={isOrchestrating ? 'CEO is delegating...' : 'Describe what you want built...'}
-                  className="flex-1 bg-transparent text-[13px] text-black placeholder-gray-300 outline-none resize-none py-2.5 pr-3 min-h-[20px] max-h-32"
+                  className="flex-1 bg-transparent text-[13px] text-black placeholder-black/20 outline-none resize-none py-2.5 pr-3 min-h-[20px] max-h-32"
                   disabled={isOrchestrating}
                   rows={1}
                 />
                 <button
                   type="submit"
                   disabled={isOrchestrating || !input.trim()}
-                  className="m-1 p-1.5 rounded bg-black text-white hover:bg-gray-800 disabled:opacity-20 transition-opacity shrink-0"
+                  className="m-1 p-1.5 rounded-lg bg-[#0D0D0D] text-white hover:bg-black/80 disabled:opacity-20 transition-opacity shrink-0"
                 >
                   {isOrchestrating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 </button>
               </div>
               <div className="flex items-center justify-between px-1 mt-1">
-                <span className="text-[10px] text-gray-300">enter to send · shift+enter for newline</span>
-                <span className="text-[10px] text-gray-300 hidden sm:block">CEO → specialists</span>
+                <span className="text-[10px] text-black/20">enter to send · shift+enter for newline</span>
+                <span className="text-[10px] text-black/20 hidden sm:block">CEO → specialists</span>
               </div>
             </form>
           </div>
         </div>
 
         {/* Right: Specialist Panels */}
-        <div className="flex-1 hidden md:flex flex-col min-w-0 bg-gray-50">
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-black bg-white shrink-0">
-            <Layers className="w-4 h-4" />
-            <span className="text-xs font-bold">Specialist Agents</span>
+        <div className="flex-1 hidden md:flex flex-col min-w-0 bg-[#FAFAFA]">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-black/[0.06] bg-white shrink-0">
+            <Layers className="w-4 h-4 text-black/50" />
+            <span className="text-xs font-semibold">Specialist Agents</span>
             {specialistEntries.length > 0 && (
-              <span className="text-[10px] bg-black text-white px-1.5 py-0.5 rounded-full font-bold ml-auto">
+              <span className="text-[10px] bg-[#5046E5] text-white px-1.5 py-0.5 rounded-full font-bold ml-auto">
                 {specialistEntries.length} active
               </span>
             )}
@@ -666,9 +637,9 @@ export default function Workspace() {
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {specialistEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-6">
-                <Layers className="w-8 h-8 text-gray-200 mb-3" />
-                <p className="text-sm font-bold text-gray-400">No agents deployed yet</p>
-                <p className="text-xs text-gray-300 mt-1 max-w-xs leading-relaxed">
+                <Layers className="w-8 h-8 text-black/10 mb-3" />
+                <p className="text-sm font-semibold text-black/40">No agents deployed yet</p>
+                <p className="text-xs text-black/30 mt-1 max-w-xs leading-relaxed">
                   Submit a task to Oikos. The CEO will break it down and deploy specialist agents to work in parallel.
                 </p>
               </div>

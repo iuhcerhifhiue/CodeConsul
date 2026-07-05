@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 const lines = [
   { type: 'user', text: 'Add JWT auth with refresh tokens' },
@@ -29,74 +29,74 @@ export default function TerminalPreview() {
 
   return (
     <div className="relative">
-      <div className="absolute -inset-4 bg-[#C8FF00]/[0.04] rounded-2xl blur-3xl pointer-events-none" />
+      <div className="absolute -inset-6 bg-[#5046E5]/[0.06] rounded-3xl blur-3xl pointer-events-none" />
 
-      <div className="relative bg-[#0D0D0F] border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
+      <div className="relative bg-white border border-black/[0.08] rounded-xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-black/[0.06] bg-[#FAFAFA]">
           <div className="flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
-            <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
-            <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
+            <div className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]" />
+            <div className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
+            <div className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
           </div>
           <div className="ml-2 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#C8FF00] animate-pulse" />
-            <span className="text-xs text-white/50 font-mono">oikos — workspace</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#5046E5] animate-pulse" />
+            <span className="text-xs text-black/40 font-mono">oikos — workspace</span>
           </div>
         </div>
 
-        <div className="p-5 min-h-[380px] font-mono text-[13px]">
+        <div className="p-5 min-h-[380px] font-mono text-[13px] bg-white">
           {lines.slice(0, visible).map((line, i) => {
             if (line.type === 'user') return (
               <div key={i} className="animate-stream-in flex gap-2 py-0.5">
-                <span className="text-[#C8FF00]">›</span>
-                <span className="text-white/90">{line.text}</span>
+                <span className="text-[#5046E5]">›</span>
+                <span className="text-black/90">{line.text}</span>
               </div>
             );
             if (line.type === 'phase') return (
               <div key={i} className="animate-stream-in py-1.5 mt-3 first:mt-0">
-                <span className="text-[10px] text-white/30 tracking-widest uppercase">{line.text}</span>
+                <span className="text-[10px] text-black/30 tracking-widest uppercase">{line.text}</span>
               </div>
             );
             if (line.type === 'deploy') return (
               <div key={i} className="animate-stream-in flex items-center gap-2 py-0.5">
-                <span className="text-white/20">→</span>
-                <span className="text-[#C8FF00] font-semibold text-[12px]">{line.agent}</span>
-                <span className="text-white/30 text-[10px]">deployed</span>
-                <span className="text-white/40 text-[11px] truncate">{line.task}</span>
+                <span className="text-black/20">→</span>
+                <span className="text-[#5046E5] font-semibold text-[12px]">{line.agent}</span>
+                <span className="text-black/30 text-[10px]">deployed</span>
+                <span className="text-black/40 text-[11px] truncate">{line.task}</span>
               </div>
             );
             if (line.type === 'read') return (
               <div key={i} className="animate-stream-in flex items-center gap-2 py-0.5 ml-4">
-                <CheckCircle2 className="w-2.5 h-2.5 text-white/20" />
-                <span className="text-white/30 text-[11px]">read</span>
-                <span className="text-white/50 text-[12px]">{line.file}</span>
+                <Check className="w-2.5 h-2.5 text-black/20" />
+                <span className="text-black/30 text-[11px]">read</span>
+                <span className="text-black/50 text-[12px]">{line.file}</span>
               </div>
             );
             if (line.type === 'write' || line.type === 'edit') return (
               <div key={i} className="animate-stream-in flex items-center gap-2 py-0.5 ml-4">
-                <CheckCircle2 className="w-2.5 h-2.5 text-[#C8FF00]" />
-                <span className="text-[#C8FF00] text-[11px] font-semibold">{line.type}</span>
-                <span className="text-white/80 text-[12px]">{line.file}</span>
-                <span className="text-white/25 text-[10px] ml-auto">{line.detail}</span>
+                <Check className="w-2.5 h-2.5 text-[#5046E5]" />
+                <span className="text-[#5046E5] text-[11px] font-semibold">{line.type}</span>
+                <span className="text-black/80 text-[12px]">{line.file}</span>
+                <span className="text-black/25 text-[10px] ml-auto">{line.detail}</span>
               </div>
             );
             if (line.type === 'commit') return (
-              <div key={i} className="animate-stream-in flex items-center gap-2 py-1 mt-3 pt-3 border-t border-white/[0.06]">
-                <span className="text-blue-400 text-[11px]">↳</span>
-                <span className="text-blue-400 text-[11px] font-semibold">{line.sha}</span>
-                <span className="text-white/40 text-[11px] truncate">{line.msg}</span>
+              <div key={i} className="animate-stream-in flex items-center gap-2 py-1 mt-3 pt-3 border-t border-black/[0.06]">
+                <span className="text-[#5046E5] text-[11px]">↳</span>
+                <span className="text-[#5046E5] text-[11px] font-semibold">{line.sha}</span>
+                <span className="text-black/40 text-[11px] truncate">{line.msg}</span>
               </div>
             );
             if (line.type === 'done') return (
               <div key={i} className="animate-stream-in flex items-center gap-2 py-1 mt-2">
-                <span className="w-2 h-2 rounded-full bg-[#C8FF00]" />
-                <span className="text-white/80 text-[12px] font-semibold">{line.text}</span>
+                <span className="w-2 h-2 rounded-full bg-[#5046E5]" />
+                <span className="text-black/80 text-[12px] font-semibold">{line.text}</span>
               </div>
             );
             return null;
           })}
           {visible < lines.length && (
-            <span className="inline-block w-2 h-4 bg-[#C8FF00] animate-blink ml-1 mt-1" />
+            <span className="inline-block w-2 h-4 bg-[#5046E5] animate-blink ml-1 mt-1" />
           )}
         </div>
       </div>

@@ -12,15 +12,15 @@ export default function CodeBlock({ code, language }) {
   };
 
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-gray-200 bg-gray-900">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700">
-        <span className="font-mono text-xs text-gray-400 uppercase tracking-wider">{language || 'text'}</span>
-        <button onClick={handleCopy} className="text-gray-500 hover:text-white transition-colors">
-          {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+    <div className="my-3 rounded-lg overflow-hidden border border-black/[0.08] bg-[#0D0D0D]">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#161618] border-b border-white/[0.06]">
+        <span className="font-mono text-[10px] text-white/30 uppercase tracking-wider">{language || 'text'}</span>
+        <button onClick={handleCopy} className="text-white/30 hover:text-white transition-colors">
+          {copied ? <Check className="w-3.5 h-3.5 text-[#5046E5]" /> : <Copy className="w-3.5 h-3.5" />}
         </button>
       </div>
       <pre className="p-3 overflow-x-auto">
-        <code className="font-mono text-xs text-gray-200 leading-relaxed whitespace-pre">{code}</code>
+        <code className="font-mono text-xs text-white/80 leading-relaxed whitespace-pre">{code}</code>
       </pre>
     </div>
   );
