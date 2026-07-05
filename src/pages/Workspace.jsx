@@ -84,23 +84,22 @@ export default function Workspace() {
       const proj = await base44.entities.Project.get(projectId);
       setProject(proj);
 
-      const sessions = await base44.entities.Session.filter({ project_id: projectId });
-      if (sessions.length > 0) {
-        const conv = await base44.agents.getConversation(sessions[0].conversation_id);
-        setConversationId(sessions[0].conversation_id);
-        setMessages(conv.messages || []);
-      } else {
-        const conv = await base44.agents.createConversation({
-          agent_name: 'consul',
-          metadata: { name: proj.repo_name, description: `Session for ${proj.repo_name}` },
-        });
-        await base44.entities.Session.create({
-          project_id: projectId,
-          conversation_id: conv.id,
-          title: `Session for ${proj.repo_name}`,
-        });
-        setConversationId(conv.id);
+      // Always create a fresh Consul conversation — old sessions may have been
+      // created with the deleted "oikos" agent and must not be reused.
+      const oldSessions = await base44.entities.Session.filter({ project_id: projectId });
+      for (const s of oldSessions) {
+        try { await base44.entities.Session.delete(s.id); } catch {}
       }
+      const conv = await base44.agents.createConversation({
+        agent_name: 'consul',
+        metadata: { name: proj.repo_name, description: `Session for ${proj.repo_name}` },
+      });
+      await base44.entities.Session.create({
+        project_id: projectId,
+        conversation_id: conv.id,
+        title: `Session for ${proj.repo_name}`,
+      });
+      setConversationId(conv.id);
     } catch (err) {
       console.error('Failed to load project:', err);
       setError('Failed to load project');
