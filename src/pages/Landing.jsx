@@ -1,187 +1,209 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, GitBranch, Bot, Terminal } from 'lucide-react';
-import CodeStream from '@/components/CodeStream';
+import { ArrowRight, GitBranch, Shield, Search, Users, CheckCircle2, Terminal } from 'lucide-react';
+import TerminalPreview from '@/components/landing/TerminalPreview';
+import AgentGrid from '@/components/landing/AgentGrid';
+import Logo from '@/components/Logo';
+
+const features = [
+  { icon: Search, title: 'Full repo context', desc: 'Reads your entire file tree and key files before writing a single line. No blind patches.' },
+  { icon: GitBranch, title: 'Direct to GitHub', desc: 'Every write commits instantly. Changes land on a review branch and open a pull request.' },
+  { icon: Users, title: '22 specialist agents', desc: 'Each agent owns a domain — backend, UI, security, DevOps. Oikos delegates to the right one.' },
+  { icon: Shield, title: 'Verified before PR', desc: 'Tests and builds run automatically. Failed verification triggers a repair loop before you review.' },
+];
+
+const steps = [
+  { num: '01', icon: GitBranch, title: 'Connect your repo', desc: 'Paste a GitHub URL. We index the file tree and read key files in seconds.' },
+  { num: '02', icon: Terminal, title: 'Describe the task', desc: 'Tell Oikos what you want built. It breaks down the work and delegates to specialists.' },
+  { num: '03', icon: CheckCircle2, title: 'Review the PR', desc: 'Agents write code, verify it works, and open a pull request. You review and merge.' },
+];
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-white text-black font-mono">
+    <div className="min-h-screen bg-[#08080A] text-white font-body antialiased">
       {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-black bg-white">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between px-6 md:px-10 py-4">
-          <Link to="/" className="font-bold text-xl tracking-tight">Consul</Link>
-          <div className="flex items-center gap-6">
-            <Link to="/login" className="text-sm hover:underline">Sign in</Link>
-            <Link
-              to="/register"
-              className="text-sm font-medium bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors">
-              
+      <nav className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#08080A]/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 md:px-10 py-3.5">
+          <Link to="/" className="flex items-center gap-2">
+            <Logo size={26} />
+            <span className="font-heading font-bold text-lg tracking-tight">Consul</span>
+          </Link>
+          <div className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-sm text-white/50 hover:text-white transition-colors">Features</a>
+            <a href="#workflow" className="text-sm text-white/50 hover:text-white transition-colors">Workflow</a>
+            <a href="#agents" className="text-sm text-white/50 hover:text-white transition-colors">Agents</a>
+            <Link to="/plans" className="text-sm text-white/50 hover:text-white transition-colors">Pricing</Link>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="text-sm text-white/60 hover:text-white transition-colors">Sign in</Link>
+            <Link to="/register" className="text-sm font-medium bg-[#C8FF00] text-black px-4 py-2 rounded-lg hover:bg-[#C8FF00]/90 transition-colors">
               Get started
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* 01 Hero */}
-      <section className="border-b border-black">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-16 md:py-24 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          <div>
-            <p className="text-xs font-bold tracking-[0.2em] text-editorial mb-8">01 — AUTONOMOUS CODING AGENT</p>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight">
-              DEPLOY AN AI ENGINEER THAT ACTUALLY{' '}
-              <span className="bg-editorial px-2 py-0.5 [font-family:'Inter',_system-ui,_sans-serif] text-5xl">SHIPS CODE.</span>
-            </h1>
-            <p className="text-base text-gray-600 mt-8 max-w-md leading-relaxed">
-              Paste a GitHub URL. Describe what you want built. Oikos reads your codebase, writes production-ready files, and commits directly — no hand-holding required.
-            </p>
-            <div className="flex items-center gap-3 mt-10">
-              <Link
-                to="/dashboard"
-                className="group inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
-                
-                Start building <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-              <Link
-                to="/register"
-                className="inline-flex items-center gap-2 px-6 py-3 border border-black rounded-md text-sm font-medium hover:bg-black hover:text-white transition-colors">
-                
-                Create account
-              </Link>
-            </div>
-          </div>
-          <CodeStream />
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[#C8FF00]/[0.05] rounded-full blur-[120px]" />
         </div>
-      </section>
 
-      {/* 02 Capabilities */}
-      <section className="border-b border-black">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-16 md:py-24">
-          <p className="text-xs font-bold tracking-[0.2em] text-editorial mb-4">02 — CAPABILITIES</p>
-          <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">NOT A CHATBOT. AN ENGINEER.</h2>
-          <p className="text-base text-gray-600 max-w-xl mb-12">
-            Oikos operates with full repository context — reading, writing, and committing real code.
-          </p>
+        <div className="relative max-w-7xl mx-auto px-6 md:px-10 pt-20 md:pt-28 pb-20 md:pb-32">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] mb-8">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#C8FF00] animate-pulse" />
+                <span className="text-xs text-white/60 font-medium">22 specialist agents · CEO orchestrated</span>
+              </div>
 
-          <div className="grid md:grid-cols-3 gap-px bg-black border border-black rounded-lg overflow-hidden">
-            {/* 02.1 large */}
-            <div className="md:col-span-2 md:row-span-2 bg-white p-8 flex flex-col">
-              <p className="text-xs text-gray-400 mb-4">02.1</p>
-              <h3 className="text-2xl font-bold mb-3">Reads before writing</h3>
-              <p className="text-sm text-gray-600 mb-6 max-w-md leading-relaxed">
-                Oikos analyzes your entire file tree and reads key files before touching anything. It understands your architecture, conventions, and patterns — then writes code that fits.
+              <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.05] tracking-tight">
+                An AI engineering team<br className="hidden md:block" /> that{' '}
+                <span className="text-[#C8FF00]">ships real code.</span>
+              </h1>
+
+              <p className="text-base md:text-lg text-white/50 mt-6 max-w-lg leading-relaxed">
+                Connect your repo. Describe the task. Oikos delegates to specialist agents that read your codebase, write production files, and open pull requests — autonomously.
               </p>
-              <div className="mt-auto border border-black rounded-md p-4 text-xs space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">✓</span>
-                  <span className="text-gray-500">read</span>
-                  <span>src/App.tsx</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">✓</span>
-                  <span className="text-gray-500">read</span>
-                  <span>src/lib/utils.ts</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-black font-bold">✓</span>
-                  <span className="font-bold">write</span>
-                  <span>src/components/Header.tsx</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">→</span>
-                  <span className="text-gray-500">committed</span>
-                  <span className="text-gray-500">a3f8b2c</span>
-                </div>
+
+              <div className="flex items-center gap-3 mt-10">
+                <Link to="/dashboard" className="group inline-flex items-center gap-2 px-6 py-3 bg-[#C8FF00] text-black rounded-lg text-sm font-semibold hover:bg-[#C8FF00]/90 transition-colors">
+                  Start building
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+                <Link to="/register" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white rounded-lg text-sm font-medium hover:bg-white/5 transition-colors">
+                  Create account
+                </Link>
               </div>
-            </div>
-            {/* 02.2 */}
-            <div className="bg-white p-8">
-              <p className="text-xs text-gray-400 mb-4">02.2</p>
-              <h3 className="text-lg font-bold mb-2">Direct commits</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">Every file write commits to your repo instantly. No staging, no copy-paste.</p>
-            </div>
-            {/* 02.3 */}
-            <div className="bg-white p-8">
-              <p className="text-xs text-gray-400 mb-4">02.3</p>
-              <h3 className="text-lg font-bold mb-2">Security-first</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">Input validation, sanitized outputs, no hardcoded secrets. Production-grade.</p>
-            </div>
-            {/* 02.4 full width */}
-            <div className="md:col-span-3 bg-white p-8">
-              <p className="text-xs text-gray-400 mb-4">02.4</p>
-              <div className="flex items-start gap-4">
-                <Terminal className="w-6 h-6 shrink-0 mt-1" />
+
+              <div className="flex items-center gap-8 mt-12 pt-8 border-t border-white/[0.06]">
                 <div>
-                  <h3 className="text-lg font-bold mb-2">Plan → Execute → Review → Ship</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed max-w-2xl">
-                    Every task follows a rigorous four-phase workflow. Oikos plans the approach, executes file-by-file, reviews its own work, and reports what shipped.
-                  </p>
+                  <p className="text-2xl font-bold font-heading">22</p>
+                  <p className="text-xs text-white/40 mt-0.5">specialist agents</p>
+                </div>
+                <div className="w-px h-10 bg-white/[0.06]" />
+                <div>
+                  <p className="text-2xl font-bold font-heading">∞</p>
+                  <p className="text-xs text-white/40 mt-0.5">repo context</p>
+                </div>
+                <div className="w-px h-10 bg-white/[0.06]" />
+                <div>
+                  <p className="text-2xl font-bold font-heading">PR</p>
+                  <p className="text-xs text-white/40 mt-0.5">based workflow</p>
                 </div>
               </div>
             </div>
+
+            <TerminalPreview />
           </div>
         </div>
       </section>
 
-      {/* 03 Workflow */}
-      <section className="border-b border-black">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-16 md:py-24">
-          <p className="text-xs font-bold tracking-[0.2em] text-editorial mb-4">03 — WORKFLOW</p>
-          <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-12">THREE STEPS. ZERO FRICTION.</h2>
-          <div className="grid md:grid-cols-3 gap-px bg-black border border-black rounded-lg overflow-hidden">
-            {[
-            { step: '01', icon: GitBranch, title: 'Paste a URL', desc: 'Drop any GitHub repository link. Oikos indexes the file tree and key files in seconds.' },
-            { step: '02', icon: Bot, title: 'Describe the task', desc: 'Tell Oikos what to build in plain English. It reads relevant files and plans the approach.' },
-            { step: '03', icon: ArrowRight, title: 'Review the commits', desc: 'Oikos writes complete files and commits them directly. Watch every operation in real time.' }].
-            map((s) =>
-            <div key={s.step} className="bg-white p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <s.icon className="w-5 h-5" />
-                  <span className="text-5xl font-bold text-black/10">{s.step}</span>
-                </div>
-                <h3 className="text-xl font-bold mb-3">{s.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{s.desc}</p>
-              </div>
-            )}
+      {/* Features */}
+      <section id="features" className="border-t border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 py-20 md:py-28">
+          <div className="max-w-2xl mb-16">
+            <p className="text-xs font-semibold tracking-wider text-[#C8FF00] mb-3 uppercase">Capabilities</p>
+            <h2 className="font-heading text-3xl md:text-4xl font-bold tracking-tight">Not a chatbot. An engineering team.</h2>
+            <p className="text-base text-white/50 mt-4">
+              Every agent operates with full repository context — reading, writing, and committing real code to your GitHub.
+            </p>
           </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.06] rounded-xl overflow-hidden border border-white/[0.06]">
+            {features.map((f, i) => (
+              <div key={i} className="bg-[#0D0D0F] p-6 hover:bg-[#131316] transition-colors group">
+                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-5 group-hover:bg-[#C8FF00] transition-colors">
+                  <f.icon className="w-5 h-5 text-white/60 group-hover:text-black transition-colors" />
+                </div>
+                <h3 className="text-sm font-semibold text-white mb-2">{f.title}</h3>
+                <p className="text-xs text-white/40 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Workflow */}
+      <section id="workflow" className="border-t border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 py-20 md:py-28">
+          <div className="max-w-2xl mb-16">
+            <p className="text-xs font-semibold tracking-wider text-[#C8FF00] mb-3 uppercase">Workflow</p>
+            <h2 className="font-heading text-3xl md:text-4xl font-bold tracking-tight">Three steps. Zero friction.</h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {steps.map((s, i) => (
+              <div key={i} className="relative">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-lg border border-white/10 bg-white/[0.03] flex items-center justify-center">
+                    <s.icon className="w-5 h-5 text-white/70" />
+                  </div>
+                  <span className="font-heading text-4xl font-bold text-white/[0.08]">{s.num}</span>
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-3">{s.title}</h3>
+                <p className="text-sm text-white/50 leading-relaxed">{s.desc}</p>
+                {i < steps.length - 1 && (
+                  <div className="hidden md:block absolute top-5 -right-3 text-white/10">
+                    <ArrowRight className="w-5 h-5" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Agents */}
+      <section id="agents" className="border-t border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 py-20 md:py-28">
+          <div className="max-w-2xl mb-16">
+            <p className="text-xs font-semibold tracking-wider text-[#C8FF00] mb-3 uppercase">The Team</p>
+            <h2 className="font-heading text-3xl md:text-4xl font-bold tracking-tight">22 specialists. One orchestrator.</h2>
+            <p className="text-base text-white/50 mt-4">
+              Oikos (CEO) breaks down your task and delegates to the right agents. Each specialist reads, writes, and verifies its own work.
+            </p>
+          </div>
+
+          <AgentGrid />
         </div>
       </section>
 
       {/* CTA */}
-      <section className="border-b border-black">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-16 md:py-24">
-          <div className="border-2 border-black rounded-lg p-12 md:p-16 text-center">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight">
-              STOP DESCRIBING TICKETS.<br />START SHIPPING CODE.
-            </h2>
-            <p className="text-base text-gray-600 mt-4">
-              Connect your first repo and task Oikos in under a minute.
-            </p>
-            <Link
-              to="/dashboard"
-              className="group inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-md text-sm font-semibold hover:bg-gray-800 transition-colors mt-8">
-              
-              Get started free <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </Link>
+      <section className="border-t border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 py-20 md:py-28">
+          <div className="relative rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent p-12 md:p-20 text-center overflow-hidden">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[200px] bg-[#C8FF00]/[0.06] rounded-full blur-[80px]" />
+            <div className="relative">
+              <h2 className="font-heading text-3xl md:text-5xl font-bold tracking-tight">
+                Stop describing tickets.<br />Start shipping code.
+              </h2>
+              <p className="text-base text-white/50 mt-4">
+                Connect your first repo and task Oikos in under a minute.
+              </p>
+              <Link to="/dashboard" className="group inline-flex items-center gap-2 px-8 py-4 bg-[#C8FF00] text-black rounded-lg text-sm font-semibold hover:bg-[#C8FF00]/90 transition-colors mt-8">
+                Get started free
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-white">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <span className="font-bold text-sm">Consul</span>
-            <span className="text-xs text-gray-400">Built for engineers who ship.</span>
+      <footer className="border-t border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Logo size={20} />
+            <span className="font-heading font-bold text-sm">Consul</span>
+            <span className="text-xs text-white/30 ml-4">Built for engineers who ship.</span>
           </div>
-          <div className="flex items-center gap-6 flex-wrap justify-center">
-            <Link to="/login" className="text-xs text-gray-600 hover:text-black transition-colors">Sign in</Link>
-            <a className="text-xs text-gray-600 hover:text-black transition-colors cursor-pointer">Repos</a>
-            <Link to="/register" className="text-xs text-gray-600 hover:text-black transition-colors">Get started</Link>
-            <a className="text-xs text-gray-600 hover:text-black transition-colors cursor-pointer">Blog</a>
-            <a className="text-xs text-gray-600 hover:text-black transition-colors cursor-pointer">Contact</a>
-            <span className="text-xs text-gray-300">PAGE 01 / FIN</span>
+          <div className="flex items-center gap-6">
+            <Link to="/login" className="text-xs text-white/50 hover:text-white transition-colors">Sign in</Link>
+            <Link to="/register" className="text-xs text-white/50 hover:text-white transition-colors">Get started</Link>
+            <Link to="/plans" className="text-xs text-white/50 hover:text-white transition-colors">Pricing</Link>
           </div>
         </div>
       </footer>
-    </div>);
-
+    </div>
+  );
 }
